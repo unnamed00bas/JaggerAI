@@ -100,7 +100,7 @@ export function SettingsPage() {
               {t('settings.llmProvider')}
             </label>
             <div className="flex gap-2">
-              {([['claude', 'Claude'], ['openai', 'OpenAI']] as const).map(([provider, label]) => (
+              {([['claude', 'Claude'], ['openai', 'OpenAI'], ['glm', 'GLM']] as const).map(([provider, label]) => (
                 <button
                   key={provider}
                   onClick={() => settings.setLlmProvider(provider)}
@@ -116,6 +116,15 @@ export function SettingsPage() {
             </div>
           </div>
 
+          {settings.llmProvider === 'glm' && (
+            <Input
+              label={t('settings.llmBaseUrl')}
+              value={settings.llmBaseUrl}
+              onChange={(e) => settings.setLlmBaseUrl(e.target.value)}
+              placeholder="https://open.bigmodel.cn/api/paas/v4"
+            />
+          )}
+
           <Input
             label={t('settings.llmApiKey')}
             type="password"
@@ -128,7 +137,13 @@ export function SettingsPage() {
             label={t('settings.llmModel')}
             value={settings.llmModel}
             onChange={(e) => settings.setLlmModel(e.target.value)}
-            placeholder={settings.llmProvider === 'claude' ? 'claude-sonnet-4-20250514' : 'gpt-4o-mini'}
+            placeholder={
+              settings.llmProvider === 'claude'
+                ? 'claude-sonnet-4-20250514'
+                : settings.llmProvider === 'glm'
+                  ? 'glm-4-flash'
+                  : 'gpt-4o-mini'
+            }
           />
         </div>
       </Card>

@@ -5,7 +5,7 @@ export interface LlmMessage {
 
 export interface LlmProvider {
   name: string
-  chat(messages: LlmMessage[], model: string, apiKey: string): Promise<string>
+  chat(messages: LlmMessage[], model: string, apiKey: string, baseUrl?: string): Promise<string>
 }
 
 const claudeProvider: LlmProvider = {
@@ -70,9 +70,42 @@ const openaiProvider: LlmProvider = {
   },
 }
 
+const glmProvider: LlmProvider = {
+  name: 'glm',
+  async chat(messages, model, apiKey, baseUrl) {
+    const url = baseUrl
+      ? `${baseUrl.replace(/\/+$/, '')}/v1/chat/completions`
+      : 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model || 'glm-4-flash',
+        messages: messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+        max_tokens: 1024,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`GLM API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data.choices[0].message.content
+  },
+}
+
 export const LLM_PROVIDERS: Record<string, LlmProvider> = {
   claude: claudeProvider,
   openai: openaiProvider,
+  glm: glmProvider,
 }
 
 export function getProvider(name: string): LlmProvider | undefined {

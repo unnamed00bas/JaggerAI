@@ -33,6 +33,19 @@
     "realization": "No reps left in the tank — go all out!",
     "deload": "Light and easy — recovery week"
   },
+  "dashboard": {
+    "weekProgress": "Week Progress",
+    "tips": {
+      "accumulationTitle": "Tips: Accumulation Phase",
+      "accumulation": "Focus on volume and technique. Don't go to failure — keep 2-3 reps in reserve. Ensure adequate nutrition: enough calories and protein (1.6-2.2 g/kg) to recover from the high volume.",
+      "intensificationTitle": "Tips: Intensification Phase",
+      "intensification": "Weights are going up, fewer sets. Focus on the quality of each rep. Get at least 7-8 hours of sleep. Warm up thoroughly — joints and tendons must be ready for the increased load.",
+      "realizationTitle": "Tips: Realization Phase",
+      "realization": "AMRAP week — give it your all! Rest well 1-2 days before testing. Get mentally prepared. Every rep above the target increases your training max for the next cycle.",
+      "deloadTitle": "Tips: Deload Week",
+      "deload": "Don't skip the deload — it's critical for progress. Light weights, work on technique. Do stretching and mobility work. This is the time for full recovery before the next wave."
+    }
+  },
   "cycle": {
     "title": "New Cycle",
     "enterOneRepMax": "Enter your 1RM",
@@ -97,6 +110,7 @@
     "llmProvider": "Provider",
     "llmApiKey": "API Key",
     "llmModel": "Model",
+    "llmBaseUrl": "API Address (Base URL)",
     "sync": "Cloud Sync",
     "syncEnabled": "Sync Enabled",
     "syncStatus": "Status"

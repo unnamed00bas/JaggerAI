@@ -15,6 +15,7 @@ export function CoachPage() {
   const llmProvider = useSettingsStore((s) => s.llmProvider)
   const llmApiKey = useSettingsStore((s) => s.llmApiKey)
   const llmModel = useSettingsStore((s) => s.llmModel)
+  const llmBaseUrl = useSettingsStore((s) => s.llmBaseUrl)
   const activeCycleId = useCycleStore((s) => s.activeCycleId)
 
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
@@ -88,7 +89,7 @@ export function CoachPage() {
         userMsg,
       ]
 
-      const response = await provider.chat(llmMessages, llmModel, llmApiKey)
+      const response = await provider.chat(llmMessages, llmModel, llmApiKey, llmBaseUrl)
       setMessages((prev) => [...prev, { role: 'assistant', content: response }])
     } catch (err) {
       setMessages((prev) => [
