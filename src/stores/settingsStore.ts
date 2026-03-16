@@ -1,0 +1,44 @@
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import type { MethodVariant } from '../types'
+
+interface SettingsState {
+  theme: 'system' | 'light' | 'dark'
+  language: 'ru' | 'en'
+  variant: MethodVariant
+  restTimerSeconds: number
+  llmProvider: 'claude' | 'openai' | null
+  llmApiKey: string
+  llmModel: string
+
+  setTheme: (theme: 'system' | 'light' | 'dark') => void
+  setLanguage: (language: 'ru' | 'en') => void
+  setVariant: (variant: MethodVariant) => void
+  setRestTimerSeconds: (seconds: number) => void
+  setLlmProvider: (provider: 'claude' | 'openai' | null) => void
+  setLlmApiKey: (key: string) => void
+  setLlmModel: (model: string) => void
+}
+
+export const useSettingsStore = create<SettingsState>()(
+  persist(
+    (set) => ({
+      theme: 'system',
+      language: 'ru',
+      variant: 'classic',
+      restTimerSeconds: 120,
+      llmProvider: null,
+      llmApiKey: '',
+      llmModel: '',
+
+      setTheme: (theme) => set({ theme }),
+      setLanguage: (language) => set({ language }),
+      setVariant: (variant) => set({ variant }),
+      setRestTimerSeconds: (seconds) => set({ restTimerSeconds: seconds }),
+      setLlmProvider: (provider) => set({ llmProvider: provider }),
+      setLlmApiKey: (key) => set({ llmApiKey: key }),
+      setLlmModel: (model) => set({ llmModel: model }),
+    }),
+    { name: 'jagger-settings' },
+  ),
+)
