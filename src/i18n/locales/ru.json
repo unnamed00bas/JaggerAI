@@ -111,6 +111,7 @@
     "llmApiKey": "API ключ",
     "llmModel": "Модель",
     "llmBaseUrl": "Адрес API (Base URL)",
+    "saved": "Сохранено!",
     "sync": "Облачная синхронизация",
     "syncEnabled": "Синхронизация включена",
     "syncStatus": "Статус"

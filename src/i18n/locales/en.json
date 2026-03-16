@@ -111,6 +111,7 @@
     "llmApiKey": "API Key",
     "llmModel": "Model",
     "llmBaseUrl": "API Address (Base URL)",
+    "saved": "Saved!",
     "sync": "Cloud Sync",
     "syncEnabled": "Sync Enabled",
     "syncStatus": "Status"

@@ -73,9 +73,8 @@ const openaiProvider: LlmProvider = {
 const glmProvider: LlmProvider = {
   name: 'glm',
   async chat(messages, model, apiKey, baseUrl) {
-    const url = baseUrl
-      ? `${baseUrl.replace(/\/+$/, '')}/v1/chat/completions`
-      : 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    const base = (baseUrl || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/+$/, '')
+    const url = `${base}/chat/completions`
 
     const response = await fetch(url, {
       method: 'POST',
