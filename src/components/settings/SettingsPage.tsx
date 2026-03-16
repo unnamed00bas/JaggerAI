@@ -113,6 +113,51 @@ export function SettingsPage() {
       </Card>
 
       <Card>
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <h2 className="text-sm font-semibold">{t('tabata.settings.enabled')}</h2>
+            <p className="text-xs text-surface-500 dark:text-surface-400">{t('tabata.settings.enabledDesc')}</p>
+          </div>
+          <button
+            onClick={() => { settings.setTabataEnabled(!settings.tabataEnabled); showSaved() }}
+            className={`relative w-12 h-7 rounded-full transition-colors ${
+              settings.tabataEnabled
+                ? 'bg-primary-500'
+                : 'bg-surface-300 dark:bg-surface-600'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${
+                settings.tabataEnabled ? 'translate-x-5' : ''
+              }`}
+            />
+          </button>
+        </div>
+        {settings.tabataEnabled && (
+          <div className="mt-3">
+            <h3 className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-2">
+              {t('tabata.equipment.title')}
+            </h3>
+            <div className="flex gap-2">
+              {(['bodyweight', 'kettlebell', 'mixed'] as const).map((eq) => (
+                <button
+                  key={eq}
+                  onClick={() => { settings.setTabataEquipment(eq); showSaved() }}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
+                    settings.tabataEquipment === eq
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                      : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400'
+                  }`}
+                >
+                  {t(`tabata.equipment.${eq}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <Card>
         <h2 className="text-sm font-semibold mb-3">{t('settings.llm')}</h2>
         <div className="flex flex-col gap-4">
           <div>

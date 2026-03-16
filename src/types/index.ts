@@ -86,3 +86,77 @@ export const WAVE_TARGET_REPS: Record<Wave, number> = {
   '5s': 5,
   '3s': 3,
 }
+
+// --- Tabata Conditioning ---
+
+export type TabataEquipment = 'bodyweight' | 'kettlebell' | 'mixed'
+
+export type TabataExerciseId =
+  | 'kb_swings'
+  | 'kb_snatches'
+  | 'kb_goblet_squats'
+  | 'kb_push_press'
+  | 'burpees'
+  | 'mountain_climbers'
+  | 'squat_jumps'
+  | 'push_ups'
+  | 'jumping_lunges'
+  | 'high_knees'
+  | 'kb_cleans'
+  | 'plank_jacks'
+
+export interface TabataExercise {
+  id: TabataExerciseId
+  equipment: TabataEquipment
+  targetMuscles: ('legs' | 'posterior' | 'push' | 'pull' | 'core' | 'full')[]
+}
+
+export interface TabataBlock {
+  exerciseId: TabataExerciseId
+  rounds: number // typically 8 (= 4 min)
+  workSeconds: number // typically 20
+  restSeconds: number // typically 10
+}
+
+export interface TabataWorkoutPrescription {
+  wave: Wave
+  phase: Phase
+  weekNumber: number
+  blocks: TabataBlock[]
+  totalMinutes: number
+  intensityNote: string
+}
+
+export interface TabataLog {
+  id: string
+  cycleId: string
+  wave: Wave
+  phase: Phase
+  week: number
+  blocks: TabataCompletedBlock[]
+  date: string
+  rpe: number // 1-10
+  notes: string
+}
+
+export interface TabataCompletedBlock {
+  exerciseId: TabataExerciseId
+  targetRounds: number
+  completedRounds: number
+  completed: boolean
+}
+
+export const TABATA_EXERCISES: TabataExercise[] = [
+  { id: 'kb_swings', equipment: 'kettlebell', targetMuscles: ['posterior', 'legs', 'core'] },
+  { id: 'kb_snatches', equipment: 'kettlebell', targetMuscles: ['full', 'posterior', 'pull'] },
+  { id: 'kb_goblet_squats', equipment: 'kettlebell', targetMuscles: ['legs', 'core'] },
+  { id: 'kb_push_press', equipment: 'kettlebell', targetMuscles: ['push', 'core', 'legs'] },
+  { id: 'kb_cleans', equipment: 'kettlebell', targetMuscles: ['posterior', 'pull', 'core'] },
+  { id: 'burpees', equipment: 'bodyweight', targetMuscles: ['full'] },
+  { id: 'mountain_climbers', equipment: 'bodyweight', targetMuscles: ['core', 'legs'] },
+  { id: 'squat_jumps', equipment: 'bodyweight', targetMuscles: ['legs'] },
+  { id: 'push_ups', equipment: 'bodyweight', targetMuscles: ['push', 'core'] },
+  { id: 'jumping_lunges', equipment: 'bodyweight', targetMuscles: ['legs'] },
+  { id: 'high_knees', equipment: 'bodyweight', targetMuscles: ['legs', 'core'] },
+  { id: 'plank_jacks', equipment: 'bodyweight', targetMuscles: ['core', 'legs'] },
+]

@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { MethodVariant } from '../types'
+import type { MethodVariant, TabataEquipment } from '../types'
 
 interface SettingsState {
   theme: 'system' | 'light' | 'dark'
   language: 'ru' | 'en'
   variant: MethodVariant
   restTimerSeconds: number
+  tabataEnabled: boolean
+  tabataEquipment: TabataEquipment
   llmProvider: 'claude' | 'openai' | 'glm' | null
   llmApiKey: string
   llmModel: string
@@ -16,6 +18,8 @@ interface SettingsState {
   setLanguage: (language: 'ru' | 'en') => void
   setVariant: (variant: MethodVariant) => void
   setRestTimerSeconds: (seconds: number) => void
+  setTabataEnabled: (enabled: boolean) => void
+  setTabataEquipment: (equipment: TabataEquipment) => void
   setLlmProvider: (provider: 'claude' | 'openai' | 'glm' | null) => void
   setLlmApiKey: (key: string) => void
   setLlmModel: (model: string) => void
@@ -29,6 +33,8 @@ export const useSettingsStore = create<SettingsState>()(
       language: 'ru',
       variant: 'classic',
       restTimerSeconds: 120,
+      tabataEnabled: false,
+      tabataEquipment: 'mixed',
       llmProvider: null,
       llmApiKey: '',
       llmModel: '',
@@ -38,6 +44,8 @@ export const useSettingsStore = create<SettingsState>()(
       setLanguage: (language) => set({ language }),
       setVariant: (variant) => set({ variant }),
       setRestTimerSeconds: (seconds) => set({ restTimerSeconds: seconds }),
+      setTabataEnabled: (enabled) => set({ tabataEnabled: enabled }),
+      setTabataEquipment: (equipment) => set({ tabataEquipment: equipment }),
       setLlmProvider: (provider) => set({ llmProvider: provider }),
       setLlmApiKey: (key) => set({ llmApiKey: key }),
       setLlmModel: (model) => set({ llmModel: model }),
