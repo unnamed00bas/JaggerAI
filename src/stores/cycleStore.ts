@@ -13,6 +13,8 @@ interface CycleState {
 
   createCycle: (config: Omit<CycleConfig, 'id' | 'createdAt'>) => Promise<string>
   updateTrainingMax: (cycleId: string, lift: Lift, wave: Wave, amrapReps: number) => Promise<number>
+  resetCycle: () => Promise<void>
+  startNextCycle: () => Promise<string | null>
 }
 
 export const useCycleStore = create<CycleState>()(
@@ -51,6 +53,37 @@ export const useCycleStore = create<CycleState>()(
         })
 
         return newTM
+      },
+
+      resetCycle: async () => {
+        const { activeCycleId } = useCycleStore.getState()
+        if (activeCycleId) {
+          await db.workoutLogs.where('cycleId').equals(activeCycleId).delete()
+          await db.amrapResults.where('cycleId').equals(activeCycleId).delete()
+          await db.tabataLogs.where('cycleId').equals(activeCycleId).delete()
+          await db.cycles.delete(activeCycleId)
+        }
+        set({ activeCycleId: null, currentWeek: 1 })
+      },
+
+      startNextCycle: async () => {
+        const { activeCycleId } = useCycleStore.getState()
+        if (!activeCycleId) return null
+
+        const oldCycle = await db.cycles.get(activeCycleId)
+        if (!oldCycle) return null
+
+        const id = crypto.randomUUID()
+        const cycle: CycleConfig = {
+          id,
+          variant: oldCycle.variant,
+          trainingMaxes: { ...oldCycle.trainingMaxes },
+          startDate: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        }
+        await db.cycles.add(cycle)
+        set({ activeCycleId: id, currentWeek: 1 })
+        return id
       },
     }),
     { name: 'jagger-cycle' },

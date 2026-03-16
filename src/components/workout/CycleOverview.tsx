@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -5,6 +6,7 @@ import { useCycleStore } from '../../stores/cycleStore'
 import { db } from '../../lib/db'
 import { getCycleWeeks } from '../../lib/juggernaut'
 import { Card } from '../ui/Card'
+import { Button } from '../ui/Button'
 import type { Phase } from '../../types'
 
 const PHASE_COLORS: Record<Phase, string> = {
@@ -20,6 +22,9 @@ export function CycleOverview() {
   const activeCycleId = useCycleStore((s) => s.activeCycleId)
   const currentWeek = useCycleStore((s) => s.currentWeek)
   const setCurrentWeek = useCycleStore((s) => s.setCurrentWeek)
+  const resetCycle = useCycleStore((s) => s.resetCycle)
+  const startNextCycle = useCycleStore((s) => s.startNextCycle)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
 
   const cycle = useLiveQuery(
     () => (activeCycleId ? db.cycles.get(activeCycleId) : undefined),
@@ -93,6 +98,54 @@ export function CycleOverview() {
           ))}
         </div>
       </Card>
+
+      <div className="flex flex-col gap-3 mt-2">
+        <Button
+          onClick={async () => {
+            await startNextCycle()
+            navigate('/')
+          }}
+        >
+          {t('cycle.startNextCycle')}
+        </Button>
+        <p className="text-xs text-surface-500 dark:text-surface-400 text-center -mt-1">
+          {t('cycle.nextCycleDesc')}
+        </p>
+
+        {!showResetConfirm ? (
+          <Button
+            variant="secondary"
+            onClick={() => setShowResetConfirm(true)}
+            className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700"
+          >
+            {t('cycle.resetCycle')}
+          </Button>
+        ) : (
+          <Card className="border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20">
+            <p className="text-sm text-red-700 dark:text-red-400 mb-3">
+              {t('cycle.resetConfirm')}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setShowResetConfirm(false)}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700"
+                onClick={async () => {
+                  await resetCycle()
+                  navigate('/cycle/new')
+                }}
+              >
+                {t('common.delete')}
+              </Button>
+            </div>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

@@ -10,6 +10,8 @@ import { Card } from './ui/Card'
 import { Button } from './ui/Button'
 import type { Lift, WorkoutLog, TabataLog } from '../types'
 
+const TOTAL_WEEKS = 16
+
 export function Dashboard() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -228,6 +230,38 @@ export function Dashboard() {
           {t(`dashboard.tips.${weekInfo.phase}`)}
         </p>
       </Card>
+
+      {currentWeek === TOTAL_WEEKS && completedCount === totalCount && (
+        <Card className="bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 mt-2">
+          <h3 className="text-lg font-bold text-green-800 dark:text-green-300 mb-1">
+            {t('cycle.cycleComplete')}
+          </h3>
+          <p className="text-sm text-green-700 dark:text-green-400 mb-3">
+            {t('cycle.cycleCompleteDesc')}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={async () => {
+                await useCycleStore.getState().startNextCycle()
+                navigate('/')
+              }}
+            >
+              {t('cycle.startNextCycle')}
+            </Button>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={async () => {
+                await useCycleStore.getState().resetCycle()
+                navigate('/cycle/new')
+              }}
+            >
+              {t('cycle.resetCycle')}
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <Button
         variant="secondary"
