@@ -7,17 +7,19 @@ interface SettingsState {
   language: 'ru' | 'en'
   variant: MethodVariant
   restTimerSeconds: number
-  llmProvider: 'claude' | 'openai' | null
+  llmProvider: 'claude' | 'openai' | 'glm' | null
   llmApiKey: string
   llmModel: string
+  llmBaseUrl: string
 
   setTheme: (theme: 'system' | 'light' | 'dark') => void
   setLanguage: (language: 'ru' | 'en') => void
   setVariant: (variant: MethodVariant) => void
   setRestTimerSeconds: (seconds: number) => void
-  setLlmProvider: (provider: 'claude' | 'openai' | null) => void
+  setLlmProvider: (provider: 'claude' | 'openai' | 'glm' | null) => void
   setLlmApiKey: (key: string) => void
   setLlmModel: (model: string) => void
+  setLlmBaseUrl: (url: string) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -30,6 +32,7 @@ export const useSettingsStore = create<SettingsState>()(
       llmProvider: null,
       llmApiKey: '',
       llmModel: '',
+      llmBaseUrl: '',
 
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
@@ -38,6 +41,7 @@ export const useSettingsStore = create<SettingsState>()(
       setLlmProvider: (provider) => set({ llmProvider: provider }),
       setLlmApiKey: (key) => set({ llmApiKey: key }),
       setLlmModel: (model) => set({ llmModel: model }),
+      setLlmBaseUrl: (url) => set({ llmBaseUrl: url }),
     }),
     { name: 'jagger-settings' },
   ),
