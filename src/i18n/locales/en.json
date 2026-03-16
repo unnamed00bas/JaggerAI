@@ -1,0 +1,113 @@
+{
+  "app": {
+    "name": "JaggerAI"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "workout": "Workout",
+    "analytics": "Analytics",
+    "coach": "AI Coach",
+    "settings": "Settings"
+  },
+  "lifts": {
+    "squat": "Squat",
+    "bench": "Bench Press",
+    "ohp": "Overhead Press",
+    "deadlift": "Deadlift"
+  },
+  "waves": {
+    "10s": "10s Wave",
+    "8s": "8s Wave",
+    "5s": "5s Wave",
+    "3s": "3s Wave"
+  },
+  "phases": {
+    "accumulation": "Accumulation",
+    "intensification": "Intensification",
+    "realization": "Realization",
+    "deload": "Deload"
+  },
+  "effort": {
+    "accumulation": "Leave 2-3 reps in the tank",
+    "intensification": "End 1-2 reps shy of failure",
+    "realization": "No reps left in the tank — go all out!",
+    "deload": "Light and easy — recovery week"
+  },
+  "cycle": {
+    "title": "New Cycle",
+    "enterOneRepMax": "Enter your 1RM",
+    "trainingMax": "Training Max (90%)",
+    "selectVariant": "Method Variant",
+    "classic": "Classic JM 2.0",
+    "inverted": "Inverted JM",
+    "startCycle": "Start Cycle",
+    "week": "Week {{number}}",
+    "noCycle": "No active cycle",
+    "createFirst": "Create your first training cycle",
+    "overview": "Cycle Overview"
+  },
+  "workout": {
+    "title": "Today's Workout",
+    "set": "Set {{number}}",
+    "warmup": "Warmup",
+    "workSet": "Work Set",
+    "amrap": "AMRAP",
+    "reps": "{{count}} reps",
+    "weight": "{{weight}} kg",
+    "targetReps": "Target: {{count}}+",
+    "actualReps": "Reps done",
+    "rest": "Rest",
+    "restTimer": "Rest Timer",
+    "done": "Done",
+    "finish": "Finish Workout",
+    "cancel": "Cancel",
+    "completed": "Workout Complete!",
+    "notes": "Notes (optional)"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "tmProgress": "Training Max Progress",
+    "estimatedOneRM": "Estimated 1RM",
+    "volume": "Volume (Tonnage)",
+    "amrapResults": "AMRAP Results",
+    "noData": "Complete some workouts to see analytics"
+  },
+  "coach": {
+    "title": "AI Coach",
+    "placeholder": "Ask about your training...",
+    "send": "Send",
+    "analyzing": "Analyzing your progress...",
+    "noProvider": "Configure LLM provider in Settings",
+    "prompts": {
+      "analyzeProgress": "Analyze my progress",
+      "weakPoints": "What are my weak points?",
+      "recovery": "Recovery tips",
+      "adjustTm": "Should I adjust my TM?"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "themeSystem": "System",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "language": "Language",
+    "restTimer": "Rest Timer (seconds)",
+    "llm": "AI Coach Settings",
+    "llmProvider": "Provider",
+    "llmApiKey": "API Key",
+    "llmModel": "Model",
+    "sync": "Cloud Sync",
+    "syncEnabled": "Sync Enabled",
+    "syncStatus": "Status"
+  },
+  "common": {
+    "kg": "kg",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "back": "Back",
+    "loading": "Loading...",
+    "error": "Something went wrong"
+  }
+}
