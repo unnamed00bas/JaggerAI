@@ -57,7 +57,13 @@
     "week": "Week {{number}}",
     "noCycle": "No active cycle",
     "createFirst": "Create your first training cycle",
-    "overview": "Cycle Overview"
+    "overview": "Cycle Overview",
+    "resetCycle": "Reset Cycle",
+    "resetConfirm": "Delete the current cycle and all its data? This cannot be undone.",
+    "startNextCycle": "Start Next Cycle",
+    "nextCycleDesc": "Start a new 16-week cycle using your current training maxes",
+    "cycleComplete": "Cycle Complete!",
+    "cycleCompleteDesc": "Great job finishing the cycle! Start a new one with updated training maxes or reset to enter new 1RMs."
   },
   "workout": {
     "title": "Today's Workout",
