@@ -53,7 +53,7 @@ describe('Tabata Calculator', () => {
       const workout = getTabataWorkout('10s', 'accumulation', 1, 'bodyweight')
       expect(workout.blocks.length).toBeGreaterThan(0)
       // All exercises should be bodyweight
-      const bwIds = ['burpees', 'mountain_climbers', 'squat_jumps', 'push_ups', 'jumping_lunges', 'high_knees', 'plank_jacks']
+      const bwIds = ['burpees', 'mountain_climbers', 'squat_jumps', 'push_ups', 'jumping_lunges']
       for (const block of workout.blocks) {
         expect(bwIds).toContain(block.exerciseId)
       }
@@ -96,7 +96,7 @@ describe('Tabata Calculator', () => {
 
     it('respects equipment parameter', () => {
       const cycle = generateTabataCycle('bodyweight')
-      const bwIds = ['burpees', 'mountain_climbers', 'squat_jumps', 'push_ups', 'jumping_lunges', 'high_knees', 'plank_jacks']
+      const bwIds = ['burpees', 'mountain_climbers', 'squat_jumps', 'push_ups', 'jumping_lunges']
       for (const workout of cycle) {
         for (const block of workout.blocks) {
           expect(bwIds).toContain(block.exerciseId)

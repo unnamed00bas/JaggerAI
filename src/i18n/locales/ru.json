@@ -142,8 +142,8 @@
       "squat_jumps": "Прыжковые приседания",
       "push_ups": "Отжимания",
       "jumping_lunges": "Прыжковые выпады",
-      "high_knees": "Бег с высоким подниманием колен",
-      "plank_jacks": "Планка-джек"
+      "assault_bike": "Ассаулт байк",
+      "rowing": "Гребля"
     },
     "intensity": {
       "accumulation": "Умеренная интенсивность — держите технику во всех блоках",
@@ -155,6 +155,7 @@
       "title": "Оборудование",
       "bodyweight": "Своё тело",
       "kettlebell": "Гиря",
+      "cardio_machines": "Тренажёры",
       "mixed": "Смешанное"
     },
     "settings": {

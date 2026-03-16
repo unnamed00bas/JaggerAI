@@ -81,6 +81,9 @@ function getExercisesForEquipment(equipment: TabataEquipment): TabataExercise[] 
   if (equipment === 'bodyweight') {
     return TABATA_EXERCISES.filter((e) => e.equipment === 'bodyweight')
   }
+  if (equipment === 'cardio_machines') {
+    return TABATA_EXERCISES.filter((e) => e.equipment === 'cardio_machines')
+  }
   // mixed: all exercises
   return [...TABATA_EXERCISES]
 }

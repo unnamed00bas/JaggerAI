@@ -89,7 +89,7 @@ export const WAVE_TARGET_REPS: Record<Wave, number> = {
 
 // --- Tabata Conditioning ---
 
-export type TabataEquipment = 'bodyweight' | 'kettlebell' | 'mixed'
+export type TabataEquipment = 'bodyweight' | 'kettlebell' | 'cardio_machines' | 'mixed'
 
 export type TabataExerciseId =
   | 'kb_swings'
@@ -101,9 +101,9 @@ export type TabataExerciseId =
   | 'squat_jumps'
   | 'push_ups'
   | 'jumping_lunges'
-  | 'high_knees'
+  | 'assault_bike'
   | 'kb_cleans'
-  | 'plank_jacks'
+  | 'rowing'
 
 export interface TabataExercise {
   id: TabataExerciseId
@@ -157,6 +157,6 @@ export const TABATA_EXERCISES: TabataExercise[] = [
   { id: 'squat_jumps', equipment: 'bodyweight', targetMuscles: ['legs'] },
   { id: 'push_ups', equipment: 'bodyweight', targetMuscles: ['push', 'core'] },
   { id: 'jumping_lunges', equipment: 'bodyweight', targetMuscles: ['legs'] },
-  { id: 'high_knees', equipment: 'bodyweight', targetMuscles: ['legs', 'core'] },
-  { id: 'plank_jacks', equipment: 'bodyweight', targetMuscles: ['core', 'legs'] },
+  { id: 'assault_bike', equipment: 'cardio_machines', targetMuscles: ['legs', 'full'] },
+  { id: 'rowing', equipment: 'cardio_machines', targetMuscles: ['full', 'posterior', 'pull'] },
 ]

@@ -136,7 +136,7 @@ export function CycleSetup() {
               {t('tabata.equipment.title')}
             </h3>
             <div className="flex gap-2">
-              {(['bodyweight', 'kettlebell', 'mixed'] as const).map((eq) => (
+              {(['bodyweight', 'kettlebell', 'cardio_machines', 'mixed'] as const).map((eq) => (
                 <button
                   key={eq}
                   onClick={() => setSelectedEquipment(eq)}
