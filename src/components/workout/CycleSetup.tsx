@@ -7,7 +7,7 @@ import { calculateTrainingMax } from '../../lib/juggernaut'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
-import type { Lift, MethodVariant, TrainingMaxes } from '../../types'
+import type { Lift, MethodVariant, TabataEquipment, TrainingMaxes } from '../../types'
 
 const LIFT_KEYS: Lift[] = ['squat', 'bench', 'ohp', 'deadlift']
 
@@ -17,6 +17,10 @@ export function CycleSetup() {
   const createCycle = useCycleStore((s) => s.createCycle)
   const variant = useSettingsStore((s) => s.variant)
   const setVariant = useSettingsStore((s) => s.setVariant)
+  const setTabataEnabled = useSettingsStore((s) => s.setTabataEnabled)
+  const setTabataEquipment = useSettingsStore((s) => s.setTabataEquipment)
+  const tabataEnabled = useSettingsStore((s) => s.tabataEnabled)
+  const tabataEquipment = useSettingsStore((s) => s.tabataEquipment)
 
   const [oneRepMaxes, setOneRepMaxes] = useState<Record<Lift, string>>({
     squat: '',
@@ -26,6 +30,8 @@ export function CycleSetup() {
   })
 
   const [selectedVariant, setSelectedVariant] = useState<MethodVariant>(variant)
+  const [selectedTabata, setSelectedTabata] = useState(tabataEnabled)
+  const [selectedEquipment, setSelectedEquipment] = useState<TabataEquipment>(tabataEquipment)
 
   function handleChange(lift: Lift, value: string) {
     setOneRepMaxes((prev) => ({ ...prev, [lift]: value }))
@@ -40,6 +46,8 @@ export function CycleSetup() {
     }
 
     setVariant(selectedVariant)
+    setTabataEnabled(selectedTabata)
+    setTabataEquipment(selectedEquipment)
     await createCycle({
       variant: selectedVariant,
       trainingMaxes,
@@ -99,6 +107,51 @@ export function CycleSetup() {
             </button>
           ))}
         </div>
+      </Card>
+
+      <Card>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">{t('tabata.settings.enabled')}</h2>
+            <p className="text-sm text-surface-500 dark:text-surface-400">{t('tabata.settings.enabledDesc')}</p>
+          </div>
+          <button
+            onClick={() => setSelectedTabata(!selectedTabata)}
+            className={`relative w-12 h-7 rounded-full transition-colors ${
+              selectedTabata
+                ? 'bg-primary-500'
+                : 'bg-surface-300 dark:bg-surface-600'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${
+                selectedTabata ? 'translate-x-5' : ''
+              }`}
+            />
+          </button>
+        </div>
+        {selectedTabata && (
+          <div className="mt-3">
+            <h3 className="text-sm font-medium text-surface-500 dark:text-surface-400 mb-2">
+              {t('tabata.equipment.title')}
+            </h3>
+            <div className="flex gap-2">
+              {(['bodyweight', 'kettlebell', 'cardio_machines', 'mixed'] as const).map((eq) => (
+                <button
+                  key={eq}
+                  onClick={() => setSelectedEquipment(eq)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
+                    selectedEquipment === eq
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                      : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400'
+                  }`}
+                >
+                  {t(`tabata.equipment.${eq}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
 
       <Button size="lg" className="w-full" onClick={handleSubmit} disabled={!allFilled}>

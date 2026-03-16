@@ -116,6 +116,53 @@
     "syncEnabled": "Sync Enabled",
     "syncStatus": "Status"
   },
+  "tabata": {
+    "title": "Tabata Conditioning",
+    "block": "Block {{number}}",
+    "rounds": "{{count}} rounds",
+    "timing": "{{work}}s / {{rest}}s rest",
+    "totalTime": "~{{minutes}} min",
+    "frequency": "{{min}}-{{max}}x per week",
+    "startTabata": "Start Tabata",
+    "finishTabata": "Finish Tabata",
+    "rpe": "RPE (1-10)",
+    "completed": "Tabata Complete!",
+    "roundProgress": "Round {{current}}/{{total}}",
+    "work": "WORK",
+    "rest": "REST",
+    "blockRest": "Block Rest",
+    "exercises": {
+      "kb_swings": "Kettlebell Swings",
+      "kb_snatches": "Kettlebell Snatches",
+      "kb_goblet_squats": "Goblet Squats",
+      "kb_push_press": "KB Push Press",
+      "kb_cleans": "Kettlebell Cleans",
+      "burpees": "Burpees",
+      "mountain_climbers": "Mountain Climbers",
+      "squat_jumps": "Squat Jumps",
+      "push_ups": "Push-Ups",
+      "jumping_lunges": "Jumping Lunges",
+      "assault_bike": "Assault Bike",
+      "rowing": "Rowing"
+    },
+    "intensity": {
+      "accumulation": "Moderate intensity — maintain form through all blocks",
+      "intensification": "High intensity — push your pace, one block only",
+      "realization": "Moderate pace — save energy for AMRAP",
+      "deload": "Light effort — active recovery, stay moving"
+    },
+    "equipment": {
+      "title": "Equipment",
+      "bodyweight": "Bodyweight",
+      "kettlebell": "Kettlebell",
+      "cardio_machines": "Machines",
+      "mixed": "Mixed"
+    },
+    "settings": {
+      "enabled": "Tabata Conditioning",
+      "enabledDesc": "Add Tabata HIIT to your cycle for endurance"
+    }
+  },
   "common": {
     "kg": "kg",
     "save": "Save",

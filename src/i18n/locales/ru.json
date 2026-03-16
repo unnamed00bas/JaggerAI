@@ -116,6 +116,53 @@
     "syncEnabled": "Синхронизация включена",
     "syncStatus": "Статус"
   },
+  "tabata": {
+    "title": "Табата-кондиционинг",
+    "block": "Блок {{number}}",
+    "rounds": "{{count}} раундов",
+    "timing": "{{work}}с / {{rest}}с отдых",
+    "totalTime": "~{{minutes}} мин",
+    "frequency": "{{min}}-{{max}}x в неделю",
+    "startTabata": "Начать Табату",
+    "finishTabata": "Завершить Табату",
+    "rpe": "RPE (1-10)",
+    "completed": "Табата завершена!",
+    "roundProgress": "Раунд {{current}}/{{total}}",
+    "work": "РАБОТА",
+    "rest": "ОТДЫХ",
+    "blockRest": "Отдых между блоками",
+    "exercises": {
+      "kb_swings": "Махи гирей",
+      "kb_snatches": "Рывок гири",
+      "kb_goblet_squats": "Гоблет-приседания",
+      "kb_push_press": "Жимовой швунг гири",
+      "kb_cleans": "Подъём гири на грудь",
+      "burpees": "Бёрпи",
+      "mountain_climbers": "Скалолаз",
+      "squat_jumps": "Прыжковые приседания",
+      "push_ups": "Отжимания",
+      "jumping_lunges": "Прыжковые выпады",
+      "assault_bike": "Ассаулт байк",
+      "rowing": "Гребля"
+    },
+    "intensity": {
+      "accumulation": "Умеренная интенсивность — держите технику во всех блоках",
+      "intensification": "Высокая интенсивность — работайте на максимуме, один блок",
+      "realization": "Умеренный темп — берегите силы для AMRAP",
+      "deload": "Лёгкая работа — активное восстановление, не останавливайтесь"
+    },
+    "equipment": {
+      "title": "Оборудование",
+      "bodyweight": "Своё тело",
+      "kettlebell": "Гиря",
+      "cardio_machines": "Тренажёры",
+      "mixed": "Смешанное"
+    },
+    "settings": {
+      "enabled": "Табата-кондиционинг",
+      "enabledDesc": "Добавить Табата HIIT в цикл для выносливости"
+    }
+  },
   "common": {
     "kg": "кг",
     "save": "Сохранить",

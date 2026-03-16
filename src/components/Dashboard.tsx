@@ -4,10 +4,11 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useCycleStore } from '../stores/cycleStore'
 import { db } from '../lib/db'
 import { getCycleWeeks, getWeightForSet, getWorkoutPrescription } from '../lib/juggernaut'
+import { getTabataWorkout, getTabataFrequency, getTotalWorkoutSeconds } from '../lib/tabata'
 import { useSettingsStore } from '../stores/settingsStore'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
-import type { Lift, WorkoutLog } from '../types'
+import type { Lift, WorkoutLog, TabataLog } from '../types'
 
 export function Dashboard() {
   const { t } = useTranslation()
@@ -15,6 +16,8 @@ export function Dashboard() {
   const activeCycleId = useCycleStore((s) => s.activeCycleId)
   const currentWeek = useCycleStore((s) => s.currentWeek)
   const variant = useSettingsStore((s) => s.variant)
+  const tabataEnabled = useSettingsStore((s) => s.tabataEnabled)
+  const tabataEquipment = useSettingsStore((s) => s.tabataEquipment)
 
   const cycle = useLiveQuery(
     () => (activeCycleId ? db.cycles.get(activeCycleId) : undefined),
@@ -30,6 +33,17 @@ export function Dashboard() {
           .toArray()
       : Promise.resolve([] as WorkoutLog[])),
     [activeCycleId, currentWeek],
+  )
+
+  const tabataLog = useLiveQuery(
+    () => (activeCycleId && tabataEnabled
+      ? db.tabataLogs
+          .where('cycleId')
+          .equals(activeCycleId)
+          .filter((log: TabataLog) => log.week === currentWeek)
+          .first()
+      : Promise.resolve(undefined)),
+    [activeCycleId, currentWeek, tabataEnabled],
   )
 
   if (!cycle) {
@@ -160,6 +174,50 @@ export function Dashboard() {
           </Card>
         )
       })}
+
+      {/* Tabata conditioning card */}
+      {tabataEnabled && weekInfo && (() => {
+        const tabataWorkout = getTabataWorkout(weekInfo.wave, weekInfo.phase, currentWeek, tabataEquipment)
+        const freq = getTabataFrequency(weekInfo.phase)
+        const totalSec = getTotalWorkoutSeconds(tabataWorkout.blocks)
+        const isDone = !!tabataLog
+
+        return (
+          <>
+            <h2 className="text-lg font-semibold mt-4">{t('tabata.title')}</h2>
+            <Card
+              onClick={() => navigate('/workout/tabata')}
+              className={`flex items-center justify-between ${isDone ? 'opacity-60' : ''}`}
+            >
+              <div className="flex items-center gap-3">
+                {isDone ? (
+                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 rounded-full border-2 border-orange-400 dark:border-orange-500 flex-shrink-0" />
+                )}
+                <div>
+                  <div className="font-semibold">
+                    {tabataWorkout.blocks.length} {tabataWorkout.blocks.length === 1 ? 'block' : 'blocks'} &middot; {t('tabata.totalTime', { minutes: Math.ceil(totalSec / 60) })}
+                  </div>
+                  <div className="text-sm text-surface-500 dark:text-surface-400">
+                    {tabataWorkout.blocks.map((b) => t(`tabata.exercises.${b.exerciseId}`)).join(', ')}
+                  </div>
+                  <div className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
+                    {t('tabata.frequency', { min: freq.min, max: freq.max })}
+                  </div>
+                </div>
+              </div>
+              <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Card>
+          </>
+        )
+      })()}
 
       {/* Training tips */}
       <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50 mt-2">
