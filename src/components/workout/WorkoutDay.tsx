@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -32,6 +32,7 @@ export function WorkoutDay() {
   const { secondsLeft, isRunning, start: startTimer } = useRestTimer()
   const [amrapReps, setAmrapReps] = useState('')
   const [notes, setNotes] = useState('')
+  const workoutFinishedRef = useRef(false)
 
   const cycle = useLiveQuery(
     () => (activeCycleId ? db.cycles.get(activeCycleId) : undefined),
@@ -42,7 +43,7 @@ export function WorkoutDay() {
   const weekInfo = weeks[currentWeek - 1]
 
   useEffect(() => {
-    if (!cycle || !weekInfo || activeWorkout) return
+    if (!cycle || !weekInfo || activeWorkout || workoutFinishedRef.current) return
 
     const tm = cycle.trainingMaxes[lift]
     const prescription = getWorkoutPrescription(weekInfo.wave, weekInfo.phase, lift, tm, variant)
@@ -78,6 +79,7 @@ export function WorkoutDay() {
   }
 
   async function handleFinish() {
+    workoutFinishedRef.current = true
     if (weekInfo!.phase === 'realization' && amrapReps) {
       await updateTrainingMax(
         cycle!.id,
