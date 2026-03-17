@@ -122,6 +122,209 @@
 
 ---
 
+## Phase 5B: Health & Wearable Integration (Supabase Backend)
+
+> Depends on Phase 5 (Supabase infrastructure must be in place)
+
+### 5B.1 Garmin API Backend (Supabase Edge Functions)
+
+#### Garmin Developer Program Setup
+- Apply to Garmin Connect Developer Program (approval ~2 business days)
+- Register application, obtain Consumer Key and Consumer Secret
+- Configure OAuth 1.0a credentials in Supabase secrets (vault)
+
+#### Supabase Edge Functions for Garmin Health API
+- `garmin-auth`: OAuth 1.0a flow — initiate user authorization, handle callback, store tokens in `garmin_tokens` table
+- `garmin-webhook`: Receive push notifications from Garmin Health API (steps, heart rate, sleep, stress, Body Battery)
+- `garmin-activity-webhook`: Receive activity/workout data push (including .FIT file URLs)
+- `garmin-deregister`: Handle user deregistration callback
+
+#### Supabase Database Schema (Garmin)
+```sql
+-- Garmin OAuth tokens
+create table garmin_tokens (
+  user_id uuid references auth.users primary key,
+  access_token text not null,
+  token_secret text not null,
+  garmin_user_id text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Daily health summaries from Garmin
+create table garmin_daily_summaries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  calendar_date date not null,
+  steps integer,
+  resting_heart_rate integer,
+  avg_heart_rate integer,
+  max_heart_rate integer,
+  sleep_duration_seconds integer,
+  sleep_score integer,
+  stress_avg integer,
+  body_battery_high integer,
+  body_battery_low integer,
+  active_calories integer,
+  raw_payload jsonb,
+  created_at timestamptz default now(),
+  unique(user_id, calendar_date)
+);
+
+-- Activity/workout data from Garmin
+create table garmin_activities (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  garmin_activity_id text not null,
+  activity_type text,
+  start_time timestamptz,
+  duration_seconds integer,
+  avg_heart_rate integer,
+  max_heart_rate integer,
+  calories integer,
+  fit_file_url text,
+  raw_payload jsonb,
+  created_at timestamptz default now(),
+  unique(user_id, garmin_activity_id)
+);
+```
+
+- Row-Level Security (RLS) policies: users can only read their own health data
+- Indexes on `(user_id, calendar_date)` and `(user_id, start_time)`
+
+### 5B.2 Garmin Training API — Push Workouts to Watch
+
+#### Supabase Edge Function: `garmin-push-workout`
+- Accept Juggernaut Method workout definition from PWA
+- Convert to Garmin Training API workout format (structured workout with steps: warmup, work sets with reps/weight, rest intervals)
+- POST to Garmin Training API → syncs to user's Garmin watch
+- Map JM phases to Garmin workout step types:
+  - Warmup sets → `warmup` step type
+  - Work sets → `active` step type with target reps and weight notes
+  - AMRAP sets → `active` step type with open-ended rep target
+  - Deload → `cooldown` step type
+
+#### Supabase Edge Function: `garmin-schedule-workouts`
+- Accept full 16-week cycle from PWA
+- Batch-create Garmin calendar entries for each workout day
+- Support rescheduling when user shifts workout days
+
+### 5B.3 Apple Health Integration (Shortcuts → Supabase Pipeline)
+
+#### Supabase Edge Function: `apple-health-ingest`
+- HTTPS POST endpoint that receives JSON payload from Apple Shortcuts
+- Validate bearer token (simple shared secret per user, stored in Supabase vault)
+- Parse and store health metrics:
+  - Steps, active energy, resting heart rate
+  - Sleep analysis (asleep duration, time in bed)
+  - HRV (heart rate variability)
+  - Workout sessions (type, duration, calories, avg HR)
+
+#### Supabase Database Schema (Apple Health)
+```sql
+create table apple_health_metrics (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  metric_date date not null,
+  steps integer,
+  active_energy_kcal numeric,
+  resting_heart_rate integer,
+  hrv_ms numeric,
+  sleep_asleep_seconds integer,
+  sleep_in_bed_seconds integer,
+  raw_payload jsonb,
+  created_at timestamptz default now(),
+  unique(user_id, metric_date)
+);
+
+create table apple_health_workouts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  workout_type text,
+  start_time timestamptz,
+  duration_seconds integer,
+  calories integer,
+  avg_heart_rate integer,
+  raw_payload jsonb,
+  created_at timestamptz default now()
+);
+```
+
+- RLS: users read only their own data
+- Provide Apple Shortcut template (.shortcut file) for users to install:
+  - Runs daily on schedule (or manually)
+  - Reads last 24h of HealthKit data
+  - POSTs JSON to `apple-health-ingest` endpoint
+
+### 5B.4 PWA Frontend — Health Dashboard
+
+#### Health Data API Client (`src/lib/health/`)
+- `garminClient.ts` — fetch Garmin summaries and activities from Supabase
+- `appleHealthClient.ts` — fetch Apple Health metrics from Supabase
+- `healthTypes.ts` — TypeScript types for health data (DailySummary, Activity, SleepData, etc.)
+- `healthUtils.ts` — normalize data from different sources into common format
+
+#### Health Dashboard UI (`src/components/health/`)
+- `HealthOverview.tsx` — daily card: steps, HR, sleep, Body Battery, HRV
+- `RecoveryScore.tsx` — composite recovery indicator (sleep + HRV + stress + Body Battery)
+- `HealthTrends.tsx` — Recharts line/bar charts: sleep trend, resting HR trend, step trend
+- `GarminConnect.tsx` — OAuth flow trigger, connection status, disconnect
+- `AppleHealthSetup.tsx` — instructions + downloadable Shortcut link, token display, test endpoint
+
+#### Integration with AI Coach (Phase 4 extension)
+- Inject health context into LLM prompts:
+  - "Recovery score is low (poor sleep + high stress) — suggest lighter accessory work"
+  - "HRV trending down over 5 days — consider extra deload day"
+  - "Body Battery was 85 at workout start — good readiness, push AMRAP hard"
+- Pre-built prompt: "How is my recovery affecting my training?"
+
+### 5B.5 .FIT File Export/Import (Client-Side, No Backend)
+
+#### Dependencies
+- `@garmin/fitsdk` — official Garmin FIT SDK for JavaScript (read + write)
+
+#### Export: JM Workout → .FIT File (`src/lib/health/fitExport.ts`)
+- Generate .FIT workout file from Juggernaut Method workout definition
+- Include structured workout steps: warmup, work sets (reps, weight targets), rest periods
+- User downloads .FIT file → manually imports into Garmin Connect
+- Support batch export of full week or full cycle
+
+#### Import: .FIT Activity → Workout Log (`src/lib/health/fitImport.ts`)
+- Parse .FIT activity file exported from Garmin Connect
+- Extract: exercise type, sets, reps, weight (if recorded), heart rate zones, duration
+- Match to JM workout and auto-fill workout log
+- UI: drag-and-drop or file picker on Workout Day screen
+
+### 5B.6 Supabase Infrastructure
+
+#### Edge Functions Deployment
+```
+supabase/functions/
+  garmin-auth/index.ts
+  garmin-webhook/index.ts
+  garmin-activity-webhook/index.ts
+  garmin-push-workout/index.ts
+  garmin-schedule-workouts/index.ts
+  garmin-deregister/index.ts
+  apple-health-ingest/index.ts
+```
+
+#### Environment / Secrets (Supabase Vault)
+- `GARMIN_CONSUMER_KEY`, `GARMIN_CONSUMER_SECRET`
+- `APPLE_HEALTH_SHARED_SECRET` (per-user token for Shortcuts auth)
+
+#### Database Migrations
+- Migration file for all health-related tables
+- RLS policies for each table
+- Indexes for query performance
+
+#### Monitoring & Error Handling
+- Edge Function logging to Supabase dashboard
+- Webhook retry handling (Garmin may retry failed deliveries)
+- Stale data detection: flag if no Apple Health data received in >48h
+
+---
+
 ## Phase 6: Polish & Production
 
 ### 6.1 PWA Enhancements
@@ -156,6 +359,7 @@ Start with **Phase 1 + 2** (usable calculator + tracker in ~1-2 sessions), then:
 - Phase 3 (analytics) — visual feedback motivates
 - Phase 4 (AI coach) — the differentiating feature
 - Phase 5 (cloud sync) — backup and multi-device
+- Phase 5B (health & wearables) — Garmin API + Apple Health via Supabase, .FIT file support
 - Phase 6 (polish) — ongoing
 
 ## Tech Decisions Summary
