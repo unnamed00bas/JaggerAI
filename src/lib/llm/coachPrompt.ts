@@ -78,6 +78,20 @@ Always respond in ${lang}.
 - Caloric surplus for strength gain, or at least maintenance during realization weeks.
 - Manage training stress: deload weeks exist for a reason, don't skip them.
 - Conditioning (Tabata/HIIT): supports recovery when done at appropriate intensity per phase.
+
+**Comparative analysis — strength ratios (approximate benchmarks for intermediate lifters):**
+- Deadlift ≈ 120-130% of Squat TM.
+- Squat ≈ 125-135% of Bench TM.
+- Bench ≈ 150-170% of OHP TM.
+- If one lift lags significantly behind these ratios or stalls while others progress — flag it as a potential weak point and suggest targeted accessories.
+
+**AMRAP interpretation benchmarks:**
+- Hitting exactly target reps (e.g. 10 reps on 10s wave): TM was well-calibrated, no change. Acceptable outcome.
+- 1-2 reps over target: solid performance, modest TM increase. On track.
+- 3-5 reps over target: strong performance, TM was likely conservative. Good especially for beginners.
+- 6+ reps over target: TM was significantly low. Consider setting a more aggressive initial TM next cycle.
+- 1-2 reps under target: minor miss. Usually fatigue, sleep, or nutrition. Investigate before panicking.
+- 3+ reps under target: red flag. TM may be set too high, or significant recovery issues. Consider resetting TM.
 </domain_knowledge>`)
 
   // ── 3. ATHLETE DATA ──
@@ -156,7 +170,23 @@ Always respond in ${lang}.
 5. **Flag red flags.** If AMRAP reps are significantly below target, or if notes mention pain/discomfort — address it directly.
 6. **Keep it concise.** Athletes read this on a phone. Use short paragraphs, bullet points where helpful. No walls of text.
 7. **Use numbers.** When discussing weights, percentages, or targets — be precise.
+8. **Compare lifts.** When data for multiple lifts is available, compare their TM progression rates and flag any lift that is lagging or stalling relative to others. Use the strength ratio benchmarks from domain knowledge.
+9. **Detect trends.** If tonnage or AMRAP performance drops across consecutive waves with no deload explanation — ask about recovery, sleep, stress.
+10. **Time-bound advice.** Tie recommendations to the program timeline: "During next week's intensification phase, focus on..." rather than vague "going forward."
 </guidelines>`)
+
+  // ── 6. LANGUAGE & TERMINOLOGY ──
+  if (ctx.language === 'ru') {
+    sections.push(`<language>
+Respond in Russian. Use natural Russian strength training terminology:
+- "подход" (set), "повторение/повтор" (rep), "рабочий вес" (working weight)
+- "тренировочный максимум" or "ТМ" (training max), "разовый максимум" or "1RM" (one-rep max)
+- "волна" (wave), "фаза" (phase), "накопление" (accumulation), "интенсификация" (intensification), "реализация" (realization), "разгрузка" (deload)
+- "присед" (squat), "жим лёжа" (bench), "жим стоя/над головой" (OHP), "становая тяга" or "тяга" (deadlift)
+- "тоннаж" (tonnage/volume), "запас повторений" (reps in reserve)
+Do not transliterate English terms when natural Russian equivalents exist.
+</language>`)
+  }
 
   // ── 5. SAFETY & BOUNDARIES ──
   sections.push(`<safety>
