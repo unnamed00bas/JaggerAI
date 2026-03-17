@@ -190,6 +190,22 @@
       "enabledDesc": "Add Tabata HIIT to your cycle for endurance"
     }
   },
+  "auth": {
+    "title": "Account",
+    "signin": "Sign In",
+    "signup": "Sign Up",
+    "signOut": "Sign Out",
+    "password": "Password",
+    "notConfigured": "Cloud sync is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in environment."
+  },
+  "sync": {
+    "never": "Never synced",
+    "justNow": "Synced just now",
+    "minutesAgo": "Synced {{count}} min ago",
+    "hoursAgo": "Synced {{count}}h ago",
+    "syncing": "Syncing...",
+    "syncNow": "Sync Now"
+  },
   "common": {
     "kg": "kg",
     "save": "Save",

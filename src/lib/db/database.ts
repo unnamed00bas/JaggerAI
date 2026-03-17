@@ -20,6 +20,25 @@ export class JaggerDatabase extends Dexie {
       amrapResults: 'id, cycleId, [cycleId+lift+wave], date',
       tabataLogs: 'id, cycleId, [cycleId+wave+phase], date',
     })
+    this.version(3).stores({
+      cycles: 'id, createdAt, updatedAt, _dirty',
+      workoutLogs: 'id, cycleId, [cycleId+lift+wave+phase], date, updatedAt, _dirty',
+      amrapResults: 'id, cycleId, [cycleId+lift+wave], date, updatedAt, _dirty',
+      tabataLogs: 'id, cycleId, [cycleId+wave+phase], date, updatedAt, _dirty',
+    }).upgrade(tx => {
+      const now = new Date().toISOString()
+      const addSyncMeta = (table: string) =>
+        tx.table(table).toCollection().modify(record => {
+          if (!record.updatedAt) record.updatedAt = record.createdAt || record.date || now
+          if (record._dirty === undefined) record._dirty = 1
+        })
+      return Promise.all([
+        addSyncMeta('cycles'),
+        addSyncMeta('workoutLogs'),
+        addSyncMeta('amrapResults'),
+        addSyncMeta('tabataLogs'),
+      ])
+    })
   }
 }
 
