@@ -130,12 +130,12 @@ describe('Tabata Calculator', () => {
       expect(duration).toBe(240)
     })
 
-    it('total workout with 2 blocks = 2×240 + 60 rest = 540 seconds', () => {
+    it('total workout with 2 blocks = 2×240 = 480 seconds (independent blocks)', () => {
       const blocks = [
         { exerciseId: 'kb_swings' as const, rounds: 8, workSeconds: 20, restSeconds: 10 },
         { exerciseId: 'burpees' as const, rounds: 8, workSeconds: 20, restSeconds: 10 },
       ]
-      expect(getTotalWorkoutSeconds(blocks)).toBe(540)
+      expect(getTotalWorkoutSeconds(blocks)).toBe(480)
     })
 
     it('empty blocks = 0 seconds', () => {

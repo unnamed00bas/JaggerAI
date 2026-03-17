@@ -6,12 +6,12 @@ import { useCycleStore } from '../../stores/cycleStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { db } from '../../lib/db'
 import { getCycleWeeks } from '../../lib/juggernaut'
-import { getTabataWorkout, getTabataFrequency, getTotalWorkoutSeconds } from '../../lib/tabata'
+import { getTabataWorkout, getTabataFrequency, getBlockDurationSeconds } from '../../lib/tabata'
 import { useTabataTimer } from '../../hooks/useTabataTimer'
 import { useTabataAudio } from '../../hooks/useTabataAudio'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
-import type { TabataCompletedBlock, TabataExerciseId } from '../../types'
+import type { TabataBlock, TabataCompletedBlock, TabataExerciseId } from '../../types'
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -70,6 +70,8 @@ export function TabataDay() {
   const currentWeek = useCycleStore((s) => s.currentWeek)
   const tabataEquipment = useSettingsStore((s) => s.tabataEquipment)
 
+  const [activeBlockIndex, setActiveBlockIndex] = useState<number | null>(null)
+  const [completedBlocks, setCompletedBlocks] = useState<Map<number, TabataCompletedBlock>>(new Map())
   const [rpe, setRpe] = useState('')
   const [notes, setNotes] = useState('')
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
@@ -91,23 +93,33 @@ export function TabataDay() {
   const { initAudio, onPhaseChange: audioOnPhaseChange, onCountdownTick, onTimerTick } = useTabataAudio()
 
   const handlePhaseChange = useCallback(
-    (...args: [Parameters<typeof audioOnPhaseChange>[0], number]) => audioOnPhaseChange(args[0]),
+    (phase: Parameters<typeof audioOnPhaseChange>[0]) => audioOnPhaseChange(phase),
     [audioOnPhaseChange],
   )
 
   const {
     phase,
     secondsLeft,
-    currentBlock,
     currentRound,
     totalSeconds,
-    completedBlocks,
+    completedBlock,
     isPaused,
     start,
     pause,
     resume,
     stop,
-  } = useTabataTimer(workout?.blocks ?? [], handlePhaseChange)
+  } = useTabataTimer(handlePhaseChange)
+
+  // When a block finishes, record it
+  useEffect(() => {
+    if (phase === 'done' && completedBlock && activeBlockIndex !== null) {
+      setCompletedBlocks((prev) => {
+        const next = new Map(prev)
+        next.set(activeBlockIndex, completedBlock)
+        return next
+      })
+    }
+  }, [phase, completedBlock, activeBlockIndex])
 
   // Audio ticks for countdown and work/rest warnings
   useEffect(() => {
@@ -146,16 +158,21 @@ export function TabataDay() {
     return releaseWakeLock
   }, [phase])
 
-  function handleStart() {
+  function handleStartBlock(blockIndex: number, block: TabataBlock) {
     initAudio()
-    start()
+    setActiveBlockIndex(blockIndex)
+    start(block)
+  }
+
+  function handleDismissCompletion() {
+    setActiveBlockIndex(null)
   }
 
   async function handleFinish() {
     if (!workout || !activeCycleId || !weekInfo) return
 
     const blocks: TabataCompletedBlock[] = workout.blocks.map((block, i) => {
-      const completed = completedBlocks[i]
+      const completed = completedBlocks.get(i)
       return completed ?? {
         exerciseId: block.exerciseId,
         targetRounds: block.rounds,
@@ -181,16 +198,16 @@ export function TabataDay() {
 
   if (!cycle || !weekInfo || !workout) return null
 
-  const totalWorkoutSeconds = getTotalWorkoutSeconds(workout.blocks)
   const exerciseName = (id: TabataExerciseId) => t(`tabata.exercises.${id}`)
   const isActive = phase !== 'idle' && phase !== 'done'
+  const activeBlock = activeBlockIndex !== null ? workout.blocks[activeBlockIndex] : null
+  const hasAnyCompleted = completedBlocks.size > 0
 
   const phaseColorMap = {
     idle: { bg: '', ring: '#888', text: '' },
     countdown: { bg: 'bg-amber-500 dark:bg-amber-600', ring: '#f59e0b', text: 'text-white' },
     work: { bg: 'bg-red-500 dark:bg-red-600', ring: '#ef4444', text: 'text-white' },
     rest: { bg: 'bg-green-500 dark:bg-green-600', ring: '#22c55e', text: 'text-white' },
-    block_rest: { bg: 'bg-blue-500 dark:bg-blue-600', ring: '#3b82f6', text: 'text-white' },
     done: { bg: '', ring: '#888', text: '' },
   }
 
@@ -201,16 +218,14 @@ export function TabataDay() {
     countdown: t('tabata.getReady'),
     work: t('tabata.work'),
     rest: t('tabata.rest'),
-    block_rest: t('tabata.blockRest'),
     done: t('tabata.completed'),
   }[phase]
 
   const phaseDuration = {
     idle: 0,
     countdown: 3,
-    work: workout.blocks[currentBlock]?.workSeconds ?? 20,
-    rest: workout.blocks[currentBlock]?.restSeconds ?? 10,
-    block_rest: 60,
+    work: activeBlock?.workSeconds ?? 20,
+    rest: activeBlock?.restSeconds ?? 10,
     done: 0,
   }[phase]
 
@@ -231,8 +246,8 @@ export function TabataDay() {
         </div>
       </div>
 
-      {/* Timer display during active workout */}
-      {isActive && (
+      {/* Timer display during active block */}
+      {isActive && activeBlock && (
         <div className={`${currentPhaseColor.bg} ${currentPhaseColor.text} rounded-2xl border-0 py-6 px-4`}>
           <div className="text-center">
             <div className="text-sm font-medium opacity-80 mb-1">{phaseLabel}</div>
@@ -252,7 +267,7 @@ export function TabataDay() {
                   <div className="text-sm opacity-80 mt-1">
                     {t('tabata.roundProgress', {
                       current: currentRound + 1,
-                      total: workout.blocks[currentBlock]?.rounds ?? 8,
+                      total: activeBlock.rounds,
                     })}
                   </div>
                 )}
@@ -262,7 +277,7 @@ export function TabataDay() {
             {/* Current exercise name */}
             {phase !== 'countdown' && (
               <div className="text-lg font-semibold mt-1">
-                {exerciseName(workout.blocks[currentBlock]?.exerciseId)}
+                {exerciseName(activeBlock.exerciseId)}
               </div>
             )}
 
@@ -310,16 +325,25 @@ export function TabataDay() {
         </div>
       )}
 
-      {/* Completion card */}
-      {phase === 'done' && (
+      {/* Block completion card (shown after a single block finishes) */}
+      {phase === 'done' && activeBlockIndex !== null && completedBlock && (
         <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-center py-6">
           <div className="text-4xl mb-2">&#10003;</div>
           <div className="text-lg font-bold text-green-700 dark:text-green-300">
-            {t('tabata.completed')}
+            {t('tabata.blockCompleted', {
+              number: activeBlockIndex + 1,
+              exercise: exerciseName(completedBlock.exerciseId),
+            })}
           </div>
           <div className="text-sm text-green-600 dark:text-green-400 mt-1">
             {t('tabata.totalElapsed', { time: formatTime(totalSeconds) })}
           </div>
+          <button
+            onClick={handleDismissCompletion}
+            className="mt-3 text-sm text-green-600 dark:text-green-400 underline"
+          >
+            OK
+          </button>
         </Card>
       )}
 
@@ -327,7 +351,7 @@ export function TabataDay() {
       <Card>
         <div className="flex justify-between items-center mb-2">
           <span className="text-sm font-medium text-surface-500 dark:text-surface-400">
-            {t('tabata.totalTime', { minutes: Math.ceil(totalWorkoutSeconds / 60) })}
+            {t('tabata.blocksAvailable', { count: workout.blocks.length })}
           </span>
           {frequency && (
             <span className="text-sm text-surface-500 dark:text-surface-400">
@@ -340,26 +364,31 @@ export function TabataDay() {
         </p>
       </Card>
 
-      {/* Block list */}
+      {/* Block list — each block is independent */}
       {workout.blocks.map((block, i) => {
-        const isCurrentBlock = isActive && i === currentBlock
-        const completedBlock = completedBlocks[i]
-        const isDone = completedBlock?.completed
-        const isPartial = completedBlock && !completedBlock.completed
+        const isRunning = isActive && i === activeBlockIndex
+        const completed = completedBlocks.get(i)
+        const isDone = completed?.completed
+        const isPartial = completed && !completed.completed
+        const blockDuration = Math.ceil(getBlockDurationSeconds(block) / 60)
+        const canStart = !isActive
 
         return (
           <Card
             key={i}
             className={`flex items-center justify-between ${
-              isCurrentBlock ? 'ring-2 ring-primary-500 dark:ring-primary-400' : ''
+              isRunning ? 'ring-2 ring-primary-500 dark:ring-primary-400' : ''
             } ${isDone ? 'opacity-60' : ''}`}
           >
-            <div>
+            <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-surface-500 dark:text-surface-400">
                   {t('tabata.block', { number: i + 1 })}
                 </span>
-                {isCurrentBlock && (
+                <span className="text-xs text-surface-400 dark:text-surface-500">
+                  ~{blockDuration} {t('tabata.min')}
+                </span>
+                {isRunning && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 font-medium">
                     {t('tabata.current')}
                   </span>
@@ -373,8 +402,8 @@ export function TabataDay() {
               {isPartial && (
                 <div className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
                   {t('tabata.partialRounds', {
-                    completed: completedBlock.completedRounds,
-                    total: completedBlock.targetRounds,
+                    completed: completed.completedRounds,
+                    total: completed.targetRounds,
                   })}
                 </div>
               )}
@@ -388,9 +417,19 @@ export function TabataDay() {
             ) : isPartial ? (
               <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
                 <span className="text-white text-sm font-bold">
-                  {completedBlock.completedRounds}/{completedBlock.targetRounds}
+                  {completed.completedRounds}/{completed.targetRounds}
                 </span>
               </div>
+            ) : canStart ? (
+              <button
+                onClick={() => handleStartBlock(i, block)}
+                className="w-10 h-10 rounded-full bg-primary-500 dark:bg-primary-600 flex items-center justify-center flex-shrink-0"
+                aria-label={t('tabata.startBlock')}
+              >
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
             ) : (
               <div className="w-10 h-10 rounded-full border-2 border-surface-300 dark:border-surface-600 flex-shrink-0" />
             )}
@@ -398,8 +437,8 @@ export function TabataDay() {
         )
       })}
 
-      {/* RPE & Notes (shown after completion) */}
-      {phase === 'done' && (
+      {/* RPE & Notes (shown when at least one block is completed) */}
+      {hasAnyCompleted && !isActive && (
         <>
           <Card>
             <label className="text-sm font-medium text-surface-500 dark:text-surface-400">
@@ -437,14 +476,8 @@ export function TabataDay() {
         </>
       )}
 
-      {/* Action buttons */}
-      {phase === 'idle' && (
-        <Button size="lg" className="w-full" onClick={handleStart}>
-          {t('tabata.startTabata')}
-        </Button>
-      )}
-
-      {phase === 'done' && (
+      {/* Finish button — save all completed blocks */}
+      {hasAnyCompleted && !isActive && (
         <Button size="lg" className="w-full" onClick={handleFinish}>
           {t('tabata.finishTabata')}
         </Button>
