@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -5,10 +6,11 @@ import { useCycleStore } from '../stores/cycleStore'
 import { db } from '../lib/db'
 import { getCycleWeeks, getWeightForSet, getWorkoutPrescription } from '../lib/juggernaut'
 import { getTabataWorkout, getTabataFrequency, getBlockDurationSeconds } from '../lib/tabata'
+import { generateWeeklySummary } from '../lib/llm'
 import { useSettingsStore } from '../stores/settingsStore'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
-import type { Lift, WorkoutLog, TabataLog } from '../types'
+import type { Lift, WorkoutLog, TabataLog, AmrapResult } from '../types'
 
 const TOTAL_WEEKS = 16
 
@@ -20,6 +22,14 @@ export function Dashboard() {
   const variant = useSettingsStore((s) => s.variant)
   const tabataEnabled = useSettingsStore((s) => s.tabataEnabled)
   const tabataEquipment = useSettingsStore((s) => s.tabataEquipment)
+  const llmProvider = useSettingsStore((s) => s.llmProvider)
+  const llmApiKey = useSettingsStore((s) => s.llmApiKey)
+  const llmModel = useSettingsStore((s) => s.llmModel)
+  const llmBaseUrl = useSettingsStore((s) => s.llmBaseUrl)
+  const language = useSettingsStore((s) => s.language)
+
+  const [weekSummary, setWeekSummary] = useState<string | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
 
   const cycle = useLiveQuery(
     () => (activeCycleId ? db.cycles.get(activeCycleId) : undefined),
@@ -35,6 +45,20 @@ export function Dashboard() {
           .toArray()
       : Promise.resolve([] as WorkoutLog[])),
     [activeCycleId, currentWeek],
+  )
+
+  const amrapResults = useLiveQuery(
+    () => (activeCycleId
+      ? db.amrapResults.where('cycleId').equals(activeCycleId).sortBy('date')
+      : Promise.resolve([] as AmrapResult[])),
+    [activeCycleId],
+  )
+
+  const allTabataLogs = useLiveQuery(
+    () => (activeCycleId
+      ? db.tabataLogs.where('cycleId').equals(activeCycleId).sortBy('date')
+      : Promise.resolve([] as TabataLog[])),
+    [activeCycleId],
   )
 
   const tabataLog = useLiveQuery(
@@ -220,6 +244,54 @@ export function Dashboard() {
           </>
         )
       })()}
+
+      {/* Weekly AI summary — shows when all lifts are done and LLM configured */}
+      {completedCount === totalCount && llmProvider && llmApiKey && (
+        <Card className="bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-700/50 mt-2">
+          <h3 className="text-sm font-semibold text-indigo-800 dark:text-indigo-300 mb-2">
+            {t('dashboard.weekSummary')}
+          </h3>
+          {weekSummary ? (
+            <p className="text-sm text-indigo-700 dark:text-indigo-400 whitespace-pre-wrap">{weekSummary}</p>
+          ) : summaryLoading ? (
+            <p className="text-sm text-indigo-500 dark:text-indigo-400 animate-pulse">
+              {t('dashboard.summaryLoading')}
+            </p>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                setSummaryLoading(true)
+                try {
+                  const result = await generateWeeklySummary({
+                    wave: weekInfo.wave,
+                    phase: weekInfo.phase,
+                    week: currentWeek,
+                    logs: weekLogs ?? [],
+                    trainingMaxes: cycle.trainingMaxes,
+                    cycle,
+                    amrapResults: amrapResults ?? [],
+                    tabataLogs: allTabataLogs ?? [],
+                    provider: llmProvider,
+                    apiKey: llmApiKey,
+                    model: llmModel,
+                    baseUrl: llmBaseUrl || undefined,
+                    language,
+                  })
+                  setWeekSummary(result)
+                } catch {
+                  // Non-critical, silently fail
+                } finally {
+                  setSummaryLoading(false)
+                }
+              }}
+            >
+              {t('dashboard.generateSummary')}
+            </Button>
+          )}
+        </Card>
+      )}
 
       {/* Training tips */}
       <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50 mt-2">

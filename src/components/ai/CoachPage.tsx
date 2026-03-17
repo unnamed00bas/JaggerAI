@@ -5,8 +5,9 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useCycleStore } from '../../stores/cycleStore'
 import { db } from '../../lib/db'
 import { getProvider } from '../../lib/llm'
+import { buildCoachSystemPrompt } from '../../lib/llm/coachPrompt'
 import type { LlmMessage } from '../../lib/llm'
-import type { AmrapResult } from '../../types'
+import type { AmrapResult, WorkoutLog, TabataLog } from '../../types'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 
@@ -16,7 +17,9 @@ export function CoachPage() {
   const llmApiKey = useSettingsStore((s) => s.llmApiKey)
   const llmModel = useSettingsStore((s) => s.llmModel)
   const llmBaseUrl = useSettingsStore((s) => s.llmBaseUrl)
+  const language = useSettingsStore((s) => s.language)
   const activeCycleId = useCycleStore((s) => s.activeCycleId)
+  const currentWeek = useCycleStore((s) => s.currentWeek)
 
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [input, setInput] = useState('')
@@ -30,8 +33,22 @@ export function CoachPage() {
 
   const amrapResults = useLiveQuery(
     () => (activeCycleId
-      ? db.amrapResults.where('cycleId').equals(activeCycleId).toArray()
+      ? db.amrapResults.where('cycleId').equals(activeCycleId).sortBy('date')
       : Promise.resolve([] as AmrapResult[])),
+    [activeCycleId],
+  )
+
+  const workoutLogs = useLiveQuery(
+    () => (activeCycleId
+      ? db.workoutLogs.where('cycleId').equals(activeCycleId).sortBy('date')
+      : Promise.resolve([] as WorkoutLog[])),
+    [activeCycleId],
+  )
+
+  const tabataLogs = useLiveQuery(
+    () => (activeCycleId
+      ? db.tabataLogs.where('cycleId').equals(activeCycleId).sortBy('date')
+      : Promise.resolve([] as TabataLog[])),
     [activeCycleId],
   )
 
@@ -52,22 +69,14 @@ export function CoachPage() {
   }
 
   function buildSystemPrompt(): string {
-    let context = 'You are an expert strength training coach specializing in the Juggernaut Method 2.0. '
-    context += 'Provide specific, actionable advice based on the athlete\'s training data. Respond in the same language the user writes in.\n\n'
-
-    if (cycle) {
-      context += `Training Maxes: Squat ${cycle.trainingMaxes.squat}kg, Bench ${cycle.trainingMaxes.bench}kg, OHP ${cycle.trainingMaxes.ohp}kg, Deadlift ${cycle.trainingMaxes.deadlift}kg\n`
-      context += `Method variant: ${cycle.variant}\n`
-    }
-
-    if (amrapResults?.length) {
-      context += '\nAMRAP Results:\n'
-      for (const r of amrapResults) {
-        context += `- ${r.lift} (${r.wave}): ${r.actualReps} reps @ ${r.weight}kg (e1RM: ${r.estimatedOneRepMax}kg)\n`
-      }
-    }
-
-    return context
+    return buildCoachSystemPrompt({
+      cycle,
+      amrapResults: amrapResults ?? [],
+      workoutLogs: workoutLogs ?? [],
+      tabataLogs: tabataLogs ?? [],
+      language,
+      currentWeek,
+    })
   }
 
   async function handleSend(text?: string) {
