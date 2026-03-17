@@ -89,10 +89,6 @@ export function useTabataAudio() {
         playRestBeep()
         vibrate(200)
         break
-      case 'block_rest':
-        playRestBeep()
-        vibrate([200, 100, 200])
-        break
       case 'done':
         playDoneBeep()
         vibrate([100, 50, 100, 50, 300])

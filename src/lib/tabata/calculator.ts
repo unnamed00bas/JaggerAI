@@ -129,9 +129,8 @@ export function getTabataWorkout(
     })
   }
 
-  const blockMinutes = (STANDARD_WORK + STANDARD_REST) * ROUNDS_PER_BLOCK / 60 // 4 min
-  const restBetweenBlocks = blockCount > 1 ? (blockCount - 1) : 0 // 1 min rest between blocks
-  const totalMinutes = Math.ceil(blockMinutes * blockCount + restBetweenBlocks)
+  const blockMinutes = (STANDARD_WORK + STANDARD_REST) * ROUNDS_PER_BLOCK / 60 // 4 min per block
+  const totalMinutes = Math.ceil(blockMinutes * blockCount)
 
   return {
     wave,
@@ -191,7 +190,5 @@ export function getBlockDurationSeconds(block: TabataBlock): number {
 
 export function getTotalWorkoutSeconds(blocks: TabataBlock[]): number {
   if (blocks.length === 0) return 0
-  const blockDurations = blocks.reduce((sum, b) => sum + getBlockDurationSeconds(b), 0)
-  const restBetween = (blocks.length - 1) * 60 // 1 min rest between blocks
-  return blockDurations + restBetween
+  return blocks.reduce((sum, b) => sum + getBlockDurationSeconds(b), 0)
 }

@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useCycleStore } from '../stores/cycleStore'
 import { db } from '../lib/db'
 import { getCycleWeeks, getWeightForSet, getWorkoutPrescription } from '../lib/juggernaut'
-import { getTabataWorkout, getTabataFrequency, getTotalWorkoutSeconds } from '../lib/tabata'
+import { getTabataWorkout, getTabataFrequency, getBlockDurationSeconds } from '../lib/tabata'
 import { useSettingsStore } from '../stores/settingsStore'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
@@ -181,7 +181,7 @@ export function Dashboard() {
       {tabataEnabled && weekInfo && (() => {
         const tabataWorkout = getTabataWorkout(weekInfo.wave, weekInfo.phase, currentWeek, tabataEquipment)
         const freq = getTabataFrequency(weekInfo.phase)
-        const totalSec = getTotalWorkoutSeconds(tabataWorkout.blocks)
+        const blockMin = Math.ceil(getBlockDurationSeconds(tabataWorkout.blocks[0]) / 60)
         const isDone = !!tabataLog
 
         return (
@@ -203,7 +203,7 @@ export function Dashboard() {
                 )}
                 <div>
                   <div className="font-semibold">
-                    {tabataWorkout.blocks.length} {tabataWorkout.blocks.length === 1 ? 'block' : 'blocks'} &middot; {t('tabata.totalTime', { minutes: Math.ceil(totalSec / 60) })}
+                    {tabataWorkout.blocks.length} {tabataWorkout.blocks.length === 1 ? 'block' : 'blocks'} &middot; ~{blockMin} {t('tabata.min')}
                   </div>
                   <div className="text-sm text-surface-500 dark:text-surface-400">
                     {tabataWorkout.blocks.map((b) => t(`tabata.exercises.${b.exerciseId}`)).join(', ')}
