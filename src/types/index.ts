@@ -27,7 +27,12 @@ export interface TrainingMaxes {
   deadlift: number
 }
 
-export interface CycleConfig {
+export interface SyncMeta {
+  updatedAt: string
+  _dirty?: number // 1 = needs sync
+}
+
+export interface CycleConfig extends SyncMeta {
   id: string
   variant: MethodVariant
   trainingMaxes: TrainingMaxes
@@ -43,7 +48,7 @@ export interface CompletedSet {
   completed: boolean
 }
 
-export interface WorkoutLog {
+export interface WorkoutLog extends SyncMeta {
   id: string
   cycleId: string
   lift: Lift
@@ -55,7 +60,7 @@ export interface WorkoutLog {
   notes: string
 }
 
-export interface AmrapResult {
+export interface AmrapResult extends SyncMeta {
   id: string
   cycleId: string
   lift: Lift
@@ -127,7 +132,7 @@ export interface TabataWorkoutPrescription {
   intensityNote: string
 }
 
-export interface TabataLog {
+export interface TabataLog extends SyncMeta {
   id: string
   cycleId: string
   wave: Wave

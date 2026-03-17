@@ -181,6 +181,7 @@ export function TabataDay() {
       }
     })
 
+    const now = new Date().toISOString()
     await db.tabataLogs.add({
       id: crypto.randomUUID(),
       cycleId: activeCycleId,
@@ -188,9 +189,11 @@ export function TabataDay() {
       phase: weekInfo.phase,
       week: currentWeek,
       blocks,
-      date: new Date().toISOString(),
+      date: now,
       rpe: Number(rpe) || 0,
       notes,
+      updatedAt: now,
+      _dirty: 1,
     })
 
     navigate('/')

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { Card } from '../ui/Card'
 import { Input } from '../ui/Input'
+import { AuthSection } from './AuthSection'
+import { SyncSection } from './SyncSection'
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation()
@@ -35,6 +37,9 @@ export function SettingsPage() {
           </span>
         )}
       </div>
+
+      <AuthSection />
+      <SyncSection />
 
       <Card>
         <h2 className="text-sm font-semibold mb-3">{t('settings.theme')}</h2>

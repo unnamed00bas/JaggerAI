@@ -3,6 +3,11 @@ import { persist } from 'zustand/middleware'
 import type { CycleConfig, Wave, Lift } from '../types'
 import { db } from '../lib/db'
 import { calculateNewTrainingMax } from '../lib/juggernaut'
+import { useSyncStore } from './syncStore'
+
+function deferSync() {
+  setTimeout(() => useSyncStore.getState().triggerSync(), 2000)
+}
 
 interface CycleState {
   activeCycleId: string | null
@@ -11,7 +16,7 @@ interface CycleState {
   setActiveCycleId: (id: string | null) => void
   setCurrentWeek: (week: number) => void
 
-  createCycle: (config: Omit<CycleConfig, 'id' | 'createdAt'>) => Promise<string>
+  createCycle: (config: Omit<CycleConfig, 'id' | 'createdAt' | 'updatedAt' | '_dirty'>) => Promise<string>
   updateTrainingMax: (cycleId: string, lift: Lift, wave: Wave, amrapReps: number) => Promise<number>
   resetCycle: () => Promise<void>
   startNextCycle: () => Promise<string | null>
@@ -28,13 +33,17 @@ export const useCycleStore = create<CycleState>()(
 
       createCycle: async (config) => {
         const id = crypto.randomUUID()
+        const now = new Date().toISOString()
         const cycle: CycleConfig = {
           ...config,
           id,
-          createdAt: new Date().toISOString(),
+          createdAt: now,
+          updatedAt: now,
+          _dirty: 1,
         }
         await db.cycles.add(cycle)
         set({ activeCycleId: id, currentWeek: 1 })
+        deferSync()
         return id
       },
 
@@ -50,8 +59,11 @@ export const useCycleStore = create<CycleState>()(
             ...cycle.trainingMaxes,
             [lift]: newTM,
           },
+          updatedAt: new Date().toISOString(),
+          _dirty: 1,
         })
 
+        deferSync()
         return newTM
       },
 
@@ -74,15 +86,19 @@ export const useCycleStore = create<CycleState>()(
         if (!oldCycle) return null
 
         const id = crypto.randomUUID()
+        const now = new Date().toISOString()
         const cycle: CycleConfig = {
           id,
           variant: oldCycle.variant,
           trainingMaxes: { ...oldCycle.trainingMaxes },
-          startDate: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
+          startDate: now,
+          createdAt: now,
+          updatedAt: now,
+          _dirty: 1,
         }
         await db.cycles.add(cycle)
         set({ activeCycleId: id, currentWeek: 1 })
+        deferSync()
         return id
       },
     }),
