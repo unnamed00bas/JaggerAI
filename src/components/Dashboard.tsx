@@ -10,7 +10,7 @@ import { generateWeeklySummary } from '../lib/llm'
 import { useSettingsStore } from '../stores/settingsStore'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
-import type { Lift, WorkoutLog, TabataLog } from '../types'
+import type { Lift, WorkoutLog, TabataLog, AmrapResult } from '../types'
 
 const TOTAL_WEEKS = 16
 
@@ -45,6 +45,20 @@ export function Dashboard() {
           .toArray()
       : Promise.resolve([] as WorkoutLog[])),
     [activeCycleId, currentWeek],
+  )
+
+  const amrapResults = useLiveQuery(
+    () => (activeCycleId
+      ? db.amrapResults.where('cycleId').equals(activeCycleId).sortBy('date')
+      : Promise.resolve([] as AmrapResult[])),
+    [activeCycleId],
+  )
+
+  const allTabataLogs = useLiveQuery(
+    () => (activeCycleId
+      ? db.tabataLogs.where('cycleId').equals(activeCycleId).sortBy('date')
+      : Promise.resolve([] as TabataLog[])),
+    [activeCycleId],
   )
 
   const tabataLog = useLiveQuery(
@@ -256,6 +270,9 @@ export function Dashboard() {
                     week: currentWeek,
                     logs: weekLogs ?? [],
                     trainingMaxes: cycle.trainingMaxes,
+                    cycle,
+                    amrapResults: amrapResults ?? [],
+                    tabataLogs: allTabataLogs ?? [],
                     provider: llmProvider,
                     apiKey: llmApiKey,
                     model: llmModel,

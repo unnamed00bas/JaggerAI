@@ -1,6 +1,7 @@
 import { getProvider } from './provider'
+import { buildWeeklySummaryPrompt } from './coachPrompt'
 import type { LlmMessage } from './provider'
-import type { WorkoutLog, Wave, Phase, TrainingMaxes } from '../../types'
+import type { WorkoutLog, Wave, Phase, TrainingMaxes, CycleConfig, AmrapResult, TabataLog } from '../../types'
 
 interface WeeklySummaryParams {
   wave: Wave
@@ -8,6 +9,9 @@ interface WeeklySummaryParams {
   week: number
   logs: WorkoutLog[]
   trainingMaxes: TrainingMaxes
+  cycle?: CycleConfig
+  amrapResults?: AmrapResult[]
+  tabataLogs?: TabataLog[]
   provider: string
   apiKey: string
   model: string
@@ -19,7 +23,14 @@ export async function generateWeeklySummary(params: WeeklySummaryParams): Promis
   const llm = getProvider(params.provider)
   if (!llm) throw new Error('LLM provider not configured')
 
-  const lang = params.language === 'ru' ? 'Russian' : 'English'
+  const systemPrompt = buildWeeklySummaryPrompt({
+    cycle: params.cycle,
+    amrapResults: params.amrapResults,
+    workoutLogs: params.logs,
+    tabataLogs: params.tabataLogs,
+    language: params.language,
+    currentWeek: params.week,
+  })
 
   const logsSummary = params.logs.map((log) => {
     const totalTonnage = log.sets.reduce(
@@ -27,24 +38,22 @@ export async function generateWeeklySummary(params: WeeklySummaryParams): Promis
       0,
     )
     const completedSets = log.sets.filter((s) => s.completed).length
-    return `${log.lift}: ${completedSets}/${log.sets.length} sets completed, tonnage ${totalTonnage}kg`
+    return `${log.lift}: ${completedSets}/${log.sets.length} sets completed, tonnage ${Math.round(totalTonnage)} kg`
   }).join('\n')
 
   const messages: LlmMessage[] = [
     {
       role: 'system',
-      content: `You are an expert strength coach specializing in the Juggernaut Method 2.0. Provide a brief weekly training summary. Respond in ${lang}. Keep it to 4-5 sentences max.`,
+      content: systemPrompt,
     },
     {
       role: 'user',
       content: [
-        `Week ${params.week} summary (${params.wave} wave, ${params.phase} phase):`,
+        `Week ${params.week} completed (${params.wave} wave, ${params.phase} phase):`,
         '',
         logsSummary,
         '',
-        `TMs: Squat ${params.trainingMaxes.squat}kg, Bench ${params.trainingMaxes.bench}kg, OHP ${params.trainingMaxes.ohp}kg, Deadlift ${params.trainingMaxes.deadlift}kg`,
-        '',
-        'Summarize this training week: overall volume, quality of work, and what to focus on next week.',
+        'Summarize this training week.',
       ].join('\n'),
     },
   ]

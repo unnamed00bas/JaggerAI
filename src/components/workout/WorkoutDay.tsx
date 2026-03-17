@@ -11,7 +11,7 @@ import { getCycleWeeks, getWorkoutPrescription, getWeightForSet } from '../../li
 import { generateAmrapInsight } from '../../lib/llm'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
-import type { Lift, CompletedSet } from '../../types'
+import type { Lift, CompletedSet, AmrapResult } from '../../types'
 import { WAVE_TARGET_REPS } from '../../types'
 
 export function WorkoutDay() {
@@ -46,6 +46,13 @@ export function WorkoutDay() {
 
   const cycle = useLiveQuery(
     () => (activeCycleId ? db.cycles.get(activeCycleId) : undefined),
+    [activeCycleId],
+  )
+
+  const amrapResults = useLiveQuery(
+    () => (activeCycleId
+      ? db.amrapResults.where('cycleId').equals(activeCycleId).sortBy('date')
+      : Promise.resolve([] as AmrapResult[])),
     [activeCycleId],
   )
 
@@ -119,6 +126,8 @@ export function WorkoutDay() {
           oldTM: cycle!.trainingMaxes[lift],
           newTM,
           trainingMaxes: cycle!.trainingMaxes,
+          cycle: cycle!,
+          amrapResults: amrapResults ?? [],
           provider: llmProvider,
           apiKey: llmApiKey,
           model: llmModel,
