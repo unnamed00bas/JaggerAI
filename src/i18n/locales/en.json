@@ -35,6 +35,9 @@
   },
   "dashboard": {
     "weekProgress": "Week Progress",
+    "weekSummary": "Week Summary",
+    "generateSummary": "Get AI Summary",
+    "summaryLoading": "Analyzing your week...",
     "tips": {
       "accumulationTitle": "Tips: Accumulation Phase",
       "accumulation": "Focus on volume and technique. Don't go to failure — keep 2-3 reps in reserve. Ensure adequate nutrition: enough calories and protein (1.6-2.2 g/kg) to recover from the high volume.",
@@ -102,6 +105,11 @@
       "weakPoints": "What are my weak points?",
       "recovery": "Recovery tips",
       "adjustTm": "Should I adjust my TM?"
+    },
+    "insight": {
+      "title": "AI Insight",
+      "generating": "Generating insight...",
+      "dismiss": "Got it"
     }
   },
   "settings": {

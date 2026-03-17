@@ -8,9 +8,11 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useRestTimer } from '../../hooks/useRestTimer'
 import { db } from '../../lib/db'
 import { getCycleWeeks, getWorkoutPrescription, getWeightForSet } from '../../lib/juggernaut'
+import { generateAmrapInsight } from '../../lib/llm'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import type { Lift, CompletedSet } from '../../types'
+import { WAVE_TARGET_REPS } from '../../types'
 
 export function WorkoutDay() {
   const { t } = useTranslation()
@@ -30,8 +32,16 @@ export function WorkoutDay() {
   const finishWorkout = useWorkoutStore((s) => s.finishWorkout)
 
   const { secondsLeft, isRunning, start: startTimer } = useRestTimer()
+  const llmProvider = useSettingsStore((s) => s.llmProvider)
+  const llmApiKey = useSettingsStore((s) => s.llmApiKey)
+  const llmModel = useSettingsStore((s) => s.llmModel)
+  const llmBaseUrl = useSettingsStore((s) => s.llmBaseUrl)
+  const language = useSettingsStore((s) => s.language)
+
   const [amrapReps, setAmrapReps] = useState('')
   const [notes, setNotes] = useState('')
+  const [insight, setInsight] = useState<string | null>(null)
+  const [insightLoading, setInsightLoading] = useState(false)
   const workoutFinishedRef = useRef(false)
 
   const cycle = useLiveQuery(
@@ -80,8 +90,11 @@ export function WorkoutDay() {
 
   async function handleFinish() {
     workoutFinishedRef.current = true
-    if (weekInfo!.phase === 'realization' && amrapReps) {
-      await updateTrainingMax(
+    const isAmrapWorkout = weekInfo!.phase === 'realization' && amrapReps
+    let newTM: number | undefined
+
+    if (isAmrapWorkout) {
+      newTM = await updateTrainingMax(
         cycle!.id,
         lift,
         weekInfo!.wave,
@@ -89,6 +102,38 @@ export function WorkoutDay() {
       )
     }
     await finishWorkout(notes)
+
+    // Auto-generate AI insight after AMRAP if LLM is configured
+    if (isAmrapWorkout && llmProvider && llmApiKey && newTM !== undefined) {
+      setInsightLoading(true)
+      const amrapSet = activeWorkout!.sets.find((s) => s.targetReps === 'amrap')
+      const weight = amrapSet?.actualWeight ?? 0
+      const targetReps = WAVE_TARGET_REPS[weekInfo!.wave]
+      try {
+        const result = await generateAmrapInsight({
+          lift,
+          wave: weekInfo!.wave,
+          weight,
+          targetReps,
+          actualReps: Number(amrapReps),
+          oldTM: cycle!.trainingMaxes[lift],
+          newTM,
+          trainingMaxes: cycle!.trainingMaxes,
+          provider: llmProvider,
+          apiKey: llmApiKey,
+          model: llmModel,
+          baseUrl: llmBaseUrl || undefined,
+          language,
+        })
+        setInsight(result)
+      } catch {
+        // Silently fail — insight is non-critical
+      } finally {
+        setInsightLoading(false)
+      }
+      return
+    }
+
     navigate('/')
   }
 
@@ -209,6 +254,26 @@ export function WorkoutDay() {
       >
         {t('workout.finish')}
       </Button>
+
+      {(insightLoading || insight) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="max-w-sm w-full">
+            <h3 className="font-semibold mb-2">{t('coach.insight.title')}</h3>
+            {insightLoading ? (
+              <p className="text-sm text-surface-500 dark:text-surface-400 animate-pulse">
+                {t('coach.insight.generating')}
+              </p>
+            ) : (
+              <>
+                <p className="text-sm whitespace-pre-wrap mb-4">{insight}</p>
+                <Button className="w-full" onClick={() => navigate('/')}>
+                  {t('coach.insight.dismiss')}
+                </Button>
+              </>
+            )}
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

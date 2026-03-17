@@ -5,8 +5,8 @@ import { useCycleStore } from '../../stores/cycleStore'
 import { db } from '../../lib/db'
 import { estimateOneRepMax } from '../../lib/juggernaut'
 import { Card } from '../ui/Card'
-import { LIFTS } from '../../types'
-import type { AmrapResult, WorkoutLog, CompletedSet } from '../../types'
+import { LIFTS, WAVES } from '../../types'
+import type { AmrapResult, WorkoutLog, CompletedSet, CycleConfig } from '../../types'
 
 const LIFT_COLORS: Record<string, string> = {
   squat: '#ef4444',
@@ -18,6 +18,13 @@ const LIFT_COLORS: Record<string, string> = {
 export function AnalyticsPage() {
   const { t } = useTranslation()
   const activeCycleId = useCycleStore((s) => s.activeCycleId)
+
+  const cycle = useLiveQuery(
+    () => (activeCycleId
+      ? db.cycles.get(activeCycleId)
+      : Promise.resolve(undefined as CycleConfig | undefined)),
+    [activeCycleId],
+  )
 
   const amrapResults = useLiveQuery(
     () => (activeCycleId
@@ -44,6 +51,29 @@ export function AnalyticsPage() {
       </div>
     )
   }
+
+  // TM progression: start with initial TM, then newTrainingMax from each AMRAP wave
+  const tmChartData = (() => {
+    if (!cycle) return []
+    const data: Record<string, string | number>[] = [
+      { label: 'Start', ...cycle.trainingMaxes },
+    ]
+    const running: Record<string, number> = { ...cycle.trainingMaxes }
+    for (const wave of WAVES) {
+      let hasWaveData = false
+      for (const lift of LIFTS) {
+        const result = (amrapResults ?? []).find((r) => r.wave === wave && r.lift === lift)
+        if (result) {
+          running[lift] = result.newTrainingMax
+          hasWaveData = true
+        }
+      }
+      if (hasWaveData) {
+        data.push({ label: wave, ...running })
+      }
+    }
+    return data
+  })()
 
   // Group e1RM by wave for chart
   const e1rmByWave = (amrapResults ?? []).reduce<Record<string, Record<string, number>>>((acc, r) => {
@@ -83,6 +113,32 @@ export function AnalyticsPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-bold">{t('analytics.title')}</h1>
+
+      {tmChartData.length > 1 && (
+        <Card>
+          <h2 className="text-sm font-semibold mb-3">{t('analytics.tmProgress')}</h2>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={tmChartData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} domain={['dataMin - 5', 'dataMax + 5']} />
+              <Tooltip />
+              {LIFTS.map((lift) => (
+                <Line
+                  key={lift}
+                  type="monotone"
+                  dataKey={lift}
+                  stroke={LIFT_COLORS[lift]}
+                  strokeWidth={2}
+                  name={t(`lifts.${lift}`)}
+                  dot={{ r: 4 }}
+                />
+              ))}
+              <Legend />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
 
       {e1rmChartData.length > 0 && (
         <Card>

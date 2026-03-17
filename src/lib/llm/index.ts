@@ -1,2 +1,4 @@
 export { getProvider, LLM_PROVIDERS } from './provider'
 export type { LlmMessage, LlmProvider } from './provider'
+export { generateAmrapInsight } from './insight'
+export { generateWeeklySummary } from './summary'
