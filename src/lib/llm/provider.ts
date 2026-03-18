@@ -24,7 +24,7 @@ const claudeProvider: LlmProvider = {
       },
       body: JSON.stringify({
         model: model || 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        max_tokens: 4096,
         system: systemMsg?.content,
         messages: chatMessages.map((m) => ({
           role: m.role,
@@ -57,7 +57,7 @@ const openaiProvider: LlmProvider = {
           role: m.role,
           content: m.content,
         })),
-        max_tokens: 1024,
+        max_tokens: 4096,
       }),
     })
 
@@ -88,7 +88,7 @@ const glmProvider: LlmProvider = {
           role: m.role,
           content: m.content,
         })),
-        max_tokens: 1024,
+        max_tokens: 4096,
       }),
     })
 
