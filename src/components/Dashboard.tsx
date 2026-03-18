@@ -10,6 +10,7 @@ import { generateWeeklySummary } from '../lib/llm'
 import { useSettingsStore } from '../stores/settingsStore'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
+import { TrainerRecommendation } from './ai/TrainerRecommendation'
 import type { Lift, WorkoutLog, TabataLog, AmrapResult } from '../types'
 
 const TOTAL_WEEKS = 16
@@ -154,6 +155,9 @@ export function Dashboard() {
           ))}
         </div>
       </Card>
+
+      {/* AI Trainer recommendation */}
+      <TrainerRecommendation />
 
       <h2 className="text-lg font-semibold mt-2">{t('workout.title')}</h2>
 
