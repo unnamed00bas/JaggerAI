@@ -30,8 +30,27 @@ export function CoachPage() {
 
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [containerHeight, setContainerHeight] = useState('80vh')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const pendingHandled = useRef(false)
+
+  // Measure exact available height: from container top to BottomNav top
+  useEffect(() => {
+    function measure() {
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const nav = document.querySelector('nav.fixed.bottom-0')
+      const navTop = nav ? nav.getBoundingClientRect().top : window.innerHeight
+      const available = navTop - rect.top
+      if (available > 100) {
+        setContainerHeight(`${available}px`)
+      }
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
 
   const cycle = useLiveQuery(
     () => (activeCycleId ? db.cycles.get(activeCycleId) : undefined),
@@ -134,8 +153,8 @@ export function CoachPage() {
   ]
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-5rem)]">
-      <div className="flex items-center justify-between mb-3">
+    <div ref={containerRef} className="flex flex-col" style={{ height: containerHeight }}>
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <h1 className="text-xl font-bold">{t('coach.title')}</h1>
         {messages.length > 0 && (
           <Button variant="ghost" size="sm" onClick={clearHistory}>
@@ -145,7 +164,7 @@ export function CoachPage() {
       </div>
 
       {messages.length === 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-4 flex-shrink-0">
           {quickPrompts.map((p) => (
             <Button key={p.key} variant="secondary" size="sm" onClick={() => handleSend(p.label)}>
               {p.label}
@@ -154,11 +173,11 @@ export function CoachPage() {
         </div>
       )}
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col gap-3 mb-4">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 pb-2">
         {messages.map((msg, i) => (
           <div
             key={i}
-            className={`max-w-[85%] rounded-2xl p-3 shadow-sm ${
+            className={`max-w-[85%] rounded-2xl p-3 shadow-sm flex-shrink-0 ${
               msg.role === 'user'
                 ? 'self-end bg-primary-600 dark:bg-primary-700 text-white'
                 : 'self-start bg-white dark:bg-surface-800 border border-surface-100 dark:border-surface-700 text-surface-900 dark:text-surface-100'
@@ -172,7 +191,7 @@ export function CoachPage() {
           </div>
         ))}
         {loading && (
-          <div className="self-start max-w-[85%] rounded-2xl p-3 shadow-sm bg-white dark:bg-surface-800 border border-surface-100 dark:border-surface-700">
+          <div className="self-start max-w-[85%] rounded-2xl p-3 shadow-sm flex-shrink-0 bg-white dark:bg-surface-800 border border-surface-100 dark:border-surface-700">
             <p className="text-sm text-surface-500 dark:text-surface-400 animate-pulse">
               {t('coach.analyzing')}
             </p>
@@ -180,7 +199,7 @@ export function CoachPage() {
         )}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 pt-2 flex-shrink-0">
         <input
           type="text"
           value={input}
