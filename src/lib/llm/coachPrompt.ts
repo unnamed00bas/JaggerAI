@@ -227,3 +227,78 @@ The athlete completed all main lifts for this week. Provide a brief weekly summa
 Keep it motivating and specific to their data. No generic filler.
 </task>`
 }
+
+/**
+ * Build a focused prompt for daily AI trainer recommendation.
+ * Generates warm-up, main workout plan, stretching, and optional HIIT/accessory suggestion.
+ */
+export function buildTrainerRecommendationPrompt(ctx: CoachContext & {
+  completedLiftsToday: string[]
+  allWeekLogs: { lift: string; date: string; phase: string }[]
+  includeHiit: boolean
+  tabataEnabled: boolean
+  tabataEquipment?: string
+}): string {
+  const base = buildCoachSystemPrompt(ctx)
+  const lang = ctx.language === 'ru' ? 'Russian' : 'English'
+
+  const todayInfo = ctx.completedLiftsToday.length > 0
+    ? `Already completed today: ${ctx.completedLiftsToday.join(', ')}.`
+    : 'No workouts completed today yet.'
+
+  const weekLogsInfo = ctx.allWeekLogs.length > 0
+    ? `This week's completed workouts:\n${ctx.allWeekLogs.map(l => `- ${l.lift} on ${l.date} (${l.phase})`).join('\n')}`
+    : 'No workouts completed this week yet.'
+
+  const hiitSection = ctx.includeHiit
+    ? `The athlete wants HIIT/conditioning after the strength work. Suggest a specific HIIT workout that complements today's strength session. Consider:
+- Avoid overloading the same muscle groups trained in the main lift
+- Match intensity to the current training phase
+- Popular options: Tabata (20s work/10s rest), EMOM, AMRAP circuits, sprint intervals
+- Suggest specific exercises with sets/reps/timing
+- Equipment available: ${ctx.tabataEquipment || 'bodyweight'}
+`
+    : ctx.tabataEnabled
+      ? `The athlete has Tabata conditioning enabled. Briefly mention whether today would be a good day for conditioning or if they should rest, based on the main workout volume and recovery status.`
+      : ''
+
+  return base + `\n\n<task>
+You are planning today's training session for the athlete. Respond in ${lang}.
+
+${todayInfo}
+${weekLogsInfo}
+
+Provide a structured training plan for today with these sections:
+
+## 1. WARM-UP (5-10 min)
+Design a specific warm-up routine tailored to today's main lift(s). Include:
+- General warm-up (2-3 min cardio activation)
+- Dynamic stretching targeting the muscles used in today's workout
+- Activation exercises (bands, light weights) specific to the main movement
+- Include sets × reps and specific exercises
+
+## 2. MAIN WORKOUT
+Based on the Juggernaut Method cycle, identify which lift(s) the athlete should do today.
+- Show the prescribed sets, reps, and weights from the program
+- Add coaching cues specific to the lift and current phase
+- If all lifts are done this week, suggest accessory/supplemental work instead
+
+## 3. ACCESSORY WORK
+Suggest 2-3 accessory exercises that complement today's main lift:
+- Target weak points and supporting muscle groups
+- Include sets × reps recommendations
+- Keep it brief and phase-appropriate (more volume in accumulation, less in realization)
+
+${hiitSection ? `## 4. HIIT / CONDITIONING\n${hiitSection}` : ''}
+
+## ${hiitSection ? '5' : '4'}. COOL-DOWN & STRETCHING (5-10 min)
+Design a specific cool-down routine:
+- Static stretching for the muscle groups trained today
+- Include hold times (30-60s per stretch)
+- Add mobility work if relevant (hips, thoracic spine, shoulders)
+- Foam rolling recommendations if appropriate
+
+Keep the plan practical, specific, and concise. Use bullet points. No walls of text.
+Every exercise should have specific sets, reps, or duration.
+</task>`
+}

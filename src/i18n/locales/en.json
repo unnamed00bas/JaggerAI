@@ -38,6 +38,16 @@
     "weekSummary": "Week Summary",
     "generateSummary": "Get AI Summary",
     "summaryLoading": "Analyzing your week...",
+    "trainer": {
+      "title": "AI Trainer for Today",
+      "generate": "Plan Workout",
+      "loading": "Planning your workout...",
+      "hiitQuestion": "Include HIIT after strength work?",
+      "yes": "Yes",
+      "no": "No",
+      "regenerate": "Regenerate",
+      "noProvider": "Configure AI coach in Settings"
+    },
     "tips": {
       "accumulationTitle": "Tips: Accumulation Phase",
       "accumulation": "Focus on volume and technique. Don't go to failure — keep 2-3 reps in reserve. Ensure adequate nutrition: enough calories and protein (1.6-2.2 g/kg) to recover from the high volume.",
