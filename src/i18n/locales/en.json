@@ -46,7 +46,16 @@
       "yes": "Yes",
       "no": "No",
       "regenerate": "Regenerate",
-      "noProvider": "Configure AI coach in Settings"
+      "noProvider": "Configure AI coach in Settings",
+      "selectType": "What type of workout today?",
+      "types": {
+        "auto": "Auto (optimal)",
+        "strength": "Strength",
+        "crossfit": "CrossFit",
+        "tabata": "Tabata",
+        "stretching": "Stretching",
+        "aerobic": "Cardio"
+      }
     },
     "tips": {
       "accumulationTitle": "Tips: Accumulation Phase",

@@ -92,6 +92,60 @@ export const WAVE_TARGET_REPS: Record<Wave, number> = {
   '3s': 3,
 }
 
+// --- Workout Types (AI Trainer multi-modal planning) ---
+
+export type WorkoutType = 'strength' | 'crossfit' | 'tabata' | 'stretching' | 'aerobic'
+
+export type MuscleGroup = 'legs' | 'posterior' | 'push' | 'pull' | 'core' | 'full' | 'shoulders' | 'hips' | 'thoracic' | 'ankles'
+
+export type CrossfitWodFormat = 'for_time' | 'amrap' | 'emom' | 'rounds_for_time'
+
+export interface CrossfitWod {
+  id: string
+  name: string
+  format: CrossfitWodFormat
+  timeCap?: number // minutes
+  rounds?: number
+  exercises: CrossfitWodExercise[]
+  difficulty: 'beginner' | 'intermediate' | 'advanced'
+  targetMuscles: MuscleGroup[]
+  scalingNotes: string
+}
+
+export interface CrossfitWodExercise {
+  name: string
+  reps: number | string // string for "400m" or "1000m row"
+  weight?: string // e.g. "95/65 lb" or "bodyweight"
+}
+
+export interface StretchExercise {
+  id: string
+  name: string
+  type: 'dynamic' | 'static' | 'mobility'
+  targetMuscles: MuscleGroup[]
+  holdSeconds?: number // for static stretches
+  reps?: number // for dynamic stretches
+  description: string
+}
+
+export interface AerobicWorkout {
+  id: string
+  name: string
+  equipment: 'assault_bike' | 'rowing' | 'run' | 'ski_erg' | 'jump_rope' | 'none'
+  format: 'steady_state' | 'intervals' | 'pyramid' | 'emom'
+  durationMinutes: number
+  intensity: 'low' | 'moderate' | 'high'
+  description: string
+  phases: AerobicPhase[]
+}
+
+export interface AerobicPhase {
+  type: 'work' | 'rest' | 'warmup' | 'cooldown'
+  durationSeconds: number
+  intensity: string // e.g. "RPE 6-7", "max effort", "easy pace"
+  repeats?: number
+}
+
 // --- Tabata Conditioning ---
 
 export type TabataEquipment = 'bodyweight' | 'kettlebell' | 'cardio_machines' | 'mixed'
