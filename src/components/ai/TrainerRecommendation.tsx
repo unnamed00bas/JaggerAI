@@ -7,6 +7,16 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useCycleStore } from '../../stores/cycleStore'
 import { useCoachChatStore } from '../../stores/coachChatStore'
 import { getCycleWeeks } from '../../lib/juggernaut'
+import type { WorkoutType } from '../../types'
+
+const WORKOUT_TYPE_OPTIONS: { type: WorkoutType | 'auto'; icon: string; labelKey: string }[] = [
+  { type: 'auto', icon: '🎯', labelKey: 'dashboard.trainer.types.auto' },
+  { type: 'strength', icon: '🏋️', labelKey: 'dashboard.trainer.types.strength' },
+  { type: 'crossfit', icon: '💪', labelKey: 'dashboard.trainer.types.crossfit' },
+  { type: 'tabata', icon: '⏱️', labelKey: 'dashboard.trainer.types.tabata' },
+  { type: 'stretching', icon: '🧘', labelKey: 'dashboard.trainer.types.stretching' },
+  { type: 'aerobic', icon: '🚴', labelKey: 'dashboard.trainer.types.aerobic' },
+]
 
 export function TrainerRecommendation() {
   const { t } = useTranslation()
@@ -18,7 +28,7 @@ export function TrainerRecommendation() {
   const currentWeek = useCycleStore((s) => s.currentWeek)
   const setPendingPrompt = useCoachChatStore((s) => s.setPendingPrompt)
 
-  const [showHiitQuestion, setShowHiitQuestion] = useState(false)
+  const [showTypeSelector, setShowTypeSelector] = useState(false)
 
   if (!llmProvider || !llmApiKey) {
     return (
@@ -41,7 +51,7 @@ export function TrainerRecommendation() {
   const weeks = getCycleWeeks()
   const weekInfo = weeks[currentWeek - 1]
 
-  function handlePlanWorkout(includeHiit: boolean) {
+  function handleSelectType(selectedType: WorkoutType | 'auto') {
     const today = new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', {
       weekday: 'long',
       day: 'numeric',
@@ -54,9 +64,17 @@ export function TrainerRecommendation() {
         : weekInfo.phase
       : ''
 
+    const typeInstruction = selectedType === 'auto'
+      ? language === 'ru'
+        ? 'Выбери оптимальный тип тренировки (силовая / кроссфит / табата / растяжка / кардио) с учётом восстановления и баланса нагрузок.'
+        : 'Choose the optimal workout type (strength / crossfit / tabata / stretching / aerobic) based on recovery and training balance.'
+      : language === 'ru'
+        ? `Я хочу ${WORKOUT_TYPE_LABELS_RU[selectedType]}. Спланируй полную тренировку этого типа.`
+        : `I want a ${selectedType} workout. Plan a full session of this type.`
+
     const prompt = language === 'ru'
-      ? `Спланируй мне полную тренировку на сегодня (${today}). Сейчас ${phaseLabel}, неделя ${currentWeek}/16. Включи разминку, основную силовую работу по программе, подсобные упражнения, ${includeHiit ? 'HIIT/кондиционинг после силовой,' : ''} растяжку и заминку. Для каждого упражнения укажи подходы, повторения, вес или время.`
-      : `Plan my full workout for today (${today}). Currently in ${phaseLabel}, week ${currentWeek}/16. Include warm-up, main strength work from the program, accessory exercises, ${includeHiit ? 'HIIT/conditioning after strength,' : ''} stretching and cool-down. Specify sets, reps, weight or duration for each exercise.`
+      ? `Спланируй мне тренировку на сегодня (${today}). Сейчас ${phaseLabel}, неделя ${currentWeek}/16. ${typeInstruction} Включи разминку, основную часть, заминку и растяжку. Для каждого упражнения укажи подходы, повторения, вес или время.`
+      : `Plan my workout for today (${today}). Currently in ${phaseLabel}, week ${currentWeek}/16. ${typeInstruction} Include warm-up, main session, cool-down and stretching. Specify sets, reps, weight or duration for each exercise.`
 
     setPendingPrompt(prompt)
     navigate('/coach')
@@ -71,34 +89,33 @@ export function TrainerRecommendation() {
         </h3>
       </div>
 
-      {showHiitQuestion ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-violet-700 dark:text-violet-300">
-            {t('dashboard.trainer.hiitQuestion')}
+      {showTypeSelector ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-violet-600 dark:text-violet-400 mb-1">
+            {t('dashboard.trainer.selectType')}
           </p>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              onClick={() => handlePlanWorkout(true)}
-              className="flex-1"
-            >
-              {t('dashboard.trainer.yes')}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => handlePlanWorkout(false)}
-              className="flex-1"
-            >
-              {t('dashboard.trainer.no')}
-            </Button>
+          <div className="grid grid-cols-2 gap-2">
+            {WORKOUT_TYPE_OPTIONS.map((opt) => (
+              <button
+                key={opt.type}
+                onClick={() => handleSelectType(opt.type)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm
+                  bg-white dark:bg-gray-800 border border-violet-200 dark:border-violet-700/50
+                  hover:bg-violet-100 dark:hover:bg-violet-800/30
+                  active:bg-violet-200 dark:active:bg-violet-800/50
+                  text-violet-800 dark:text-violet-200 transition-colors"
+              >
+                <span>{opt.icon}</span>
+                <span className="truncate">{t(opt.labelKey)}</span>
+              </button>
+            ))}
           </div>
         </div>
       ) : (
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => setShowHiitQuestion(true)}
+          onClick={() => setShowTypeSelector(true)}
           className="w-full"
         >
           {t('dashboard.trainer.generate')}
@@ -106,4 +123,12 @@ export function TrainerRecommendation() {
       )}
     </Card>
   )
+}
+
+const WORKOUT_TYPE_LABELS_RU: Record<WorkoutType, string> = {
+  strength: 'силовую тренировку',
+  crossfit: 'кроссфит-комплекс',
+  tabata: 'табату',
+  stretching: 'растяжку и мобильность',
+  aerobic: 'кардио-тренировку',
 }

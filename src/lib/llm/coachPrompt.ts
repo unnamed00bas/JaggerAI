@@ -1,6 +1,7 @@
-import type { CycleConfig, AmrapResult, WorkoutLog, TabataLog } from '../../types'
+import type { CycleConfig, AmrapResult, WorkoutLog, TabataLog, WorkoutType } from '../../types'
 import { WAVES, WAVE_TARGET_REPS } from '../../types'
 import { getCycleWeeks } from '../juggernaut'
+import { buildCatalogSummary } from '../workouts'
 
 // ─────────────────────────────────────────────────────────
 // Centralized system prompt for all AI Coach interactions.
@@ -78,6 +79,21 @@ Always respond in ${lang}.
 - Caloric surplus for strength gain, or at least maintenance during realization weeks.
 - Manage training stress: deload weeks exist for a reason, don't skip them.
 - Conditioning (Tabata/HIIT): supports recovery when done at appropriate intensity per phase.
+
+**Multi-type training approach:**
+The athlete trains with 5 workout types for balanced fitness:
+1. **Strength** (Juggernaut Method) — primary focus, 3-4x/week
+2. **CrossFit WODs** — benchmark workouts for metabolic conditioning, 1-2x/week
+3. **Tabata** — HIIT conditioning (20s work/10s rest), 1-2x/week
+4. **Stretching/Mobility** — recovery sessions, at least 2x/week (can combine with other types)
+5. **Aerobic** — low-moderate intensity cardio (assault bike, rowing, running), 1-2x/week
+
+**Weekly balance rules:**
+- Strength is the priority — never skip JM prescribed lifts for other types
+- High-intensity work (CrossFit/Tabata) should not follow heavy strength days
+- Stretching should happen at least every 3 days
+- Aerobic work aids recovery when done at low intensity (RPE 5-6)
+- Deload weeks: only stretching and light aerobic, no CrossFit or Tabata
 
 **Comparative analysis — strength ratios (approximate benchmarks for intermediate lifters):**
 - Deadlift ≈ 120-130% of Squat TM.
@@ -230,17 +246,25 @@ Keep it motivating and specific to their data. No generic filler.
 
 /**
  * Build a focused prompt for daily AI trainer recommendation.
- * Generates warm-up, main workout plan, stretching, and optional HIIT/accessory suggestion.
+ * Generates optimal workout type selection and full session plan.
+ * Supports: strength (JM), crossfit, tabata, stretching, aerobic.
  */
 export function buildTrainerRecommendationPrompt(ctx: CoachContext & {
   completedLiftsToday: string[]
   allWeekLogs: { lift: string; date: string; phase: string }[]
+  recentWorkoutTypes: { type: WorkoutType; date: string }[]
+  daysSinceLastStretch: number | null
+  daysSinceLastAerobic: number | null
+  daysSinceLastStrength: number | null
   includeHiit: boolean
   tabataEnabled: boolean
   tabataEquipment?: string
+  availableEquipment: string[]
+  preferredWorkoutType?: WorkoutType | 'auto'
 }): string {
   const base = buildCoachSystemPrompt(ctx)
   const lang = ctx.language === 'ru' ? 'Russian' : 'English'
+  const catalog = buildCatalogSummary()
 
   const todayInfo = ctx.completedLiftsToday.length > 0
     ? `Already completed today: ${ctx.completedLiftsToday.join(', ')}.`
@@ -250,55 +274,96 @@ export function buildTrainerRecommendationPrompt(ctx: CoachContext & {
     ? `This week's completed workouts:\n${ctx.allWeekLogs.map(l => `- ${l.lift} on ${l.date} (${l.phase})`).join('\n')}`
     : 'No workouts completed this week yet.'
 
-  const hiitSection = ctx.includeHiit
-    ? `The athlete wants HIIT/conditioning after the strength work. Suggest a specific HIIT workout that complements today's strength session. Consider:
-- Avoid overloading the same muscle groups trained in the main lift
-- Match intensity to the current training phase
-- Popular options: Tabata (20s work/10s rest), EMOM, AMRAP circuits, sprint intervals
-- Suggest specific exercises with sets/reps/timing
-- Equipment available: ${ctx.tabataEquipment || 'bodyweight'}
-`
-    : ctx.tabataEnabled
-      ? `The athlete has Tabata conditioning enabled. Briefly mention whether today would be a good day for conditioning or if they should rest, based on the main workout volume and recovery status.`
-      : ''
+  const recentTypesInfo = ctx.recentWorkoutTypes.length > 0
+    ? `Recent workout types (last 7 days):\n${ctx.recentWorkoutTypes.map(w => `- ${w.type} on ${w.date}`).join('\n')}`
+    : 'No workouts in the last 7 days.'
 
-  return base + `\n\n<task>
-You are planning today's training session for the athlete. Respond in ${lang}.
+  const recoveryInfo = [
+    ctx.daysSinceLastStrength !== null ? `Days since last strength session: ${ctx.daysSinceLastStrength}` : 'No recent strength session',
+    ctx.daysSinceLastStretch !== null ? `Days since last stretching/mobility: ${ctx.daysSinceLastStretch}` : 'No recent stretching session',
+    ctx.daysSinceLastAerobic !== null ? `Days since last aerobic work: ${ctx.daysSinceLastAerobic}` : 'No recent aerobic session',
+  ].join('\n')
 
+  const equipmentInfo = ctx.availableEquipment.length > 0
+    ? `Available equipment: ${ctx.availableEquipment.join(', ')}`
+    : 'Equipment: bodyweight only'
+
+  const preferredType = ctx.preferredWorkoutType && ctx.preferredWorkoutType !== 'auto'
+    ? `\n**Athlete's preference for today:** ${ctx.preferredWorkoutType}. Honor this preference unless it would compromise recovery.`
+    : ''
+
+  return base + `\n\n<exercise_catalog>
+${catalog}
+</exercise_catalog>
+
+<task>
+You are an AI trainer planning today's optimal workout session. Respond in ${lang}.
+
+## Current Status
 ${todayInfo}
 ${weekLogsInfo}
+${recentTypesInfo}
 
-Provide a structured training plan for today with these sections:
+## Recovery Status
+${recoveryInfo}
+
+${equipmentInfo}
+${preferredType}
+
+## YOUR TASK: Choose the BEST workout type for today and plan it
+
+You have 5 workout types to choose from:
+1. **strength** — Juggernaut Method main lift (squat/bench/ohp/deadlift) + accessories
+2. **crossfit** — CrossFit WOD from the catalog (benchmark or scaled)
+3. **tabata** — Tabata HIIT conditioning (20s work / 10s rest)
+4. **stretching** — Full stretching/mobility recovery session (20-30 min)
+5. **aerobic** — Cardio session (assault bike, rowing, running)
+
+### Decision Rules (follow in order):
+1. If the athlete has pending Juggernaut Method lifts this week → prioritize **strength**
+2. If it's been 3+ days since stretching → strongly recommend **stretching** (can combine with another type)
+3. If it's a deload week → recommend **stretching** or light **aerobic** (no CrossFit/Tabata)
+4. Day after heavy strength → recommend **aerobic** (low intensity) or **stretching** for recovery
+5. If the athlete did strength 2+ days in a row → offer **crossfit**, **tabata**, or **aerobic** for variety
+6. If no aerobic work in 4+ days → suggest **aerobic**
+7. Max 2-3 CrossFit WODs per week, max 2-3 Tabata sessions per week
+8. Never schedule high-intensity work (CrossFit/Tabata/heavy strength) 2 days in a row without recovery
+9. If athlete requested a specific type — honor it (unless recovery risk)
+
+### Output Format
+
+Start your response with:
+**Тип тренировки / Workout Type:** [chosen type]
+**Reason:** [1-2 sentence justification for this choice]
+
+Then provide the full session plan:
 
 ## 1. WARM-UP (5-10 min)
-Design a specific warm-up routine tailored to today's main lift(s). Include:
-- General warm-up (2-3 min cardio activation)
-- Dynamic stretching targeting the muscles used in today's workout
-- Activation exercises (bands, light weights) specific to the main movement
-- Include sets × reps and specific exercises
+- Specific warm-up for today's workout type
+- Use dynamic stretches from the catalog
+- Include cardio activation (2-3 min)
 
-## 2. MAIN WORKOUT
-Based on the Juggernaut Method cycle, identify which lift(s) the athlete should do today.
-- Show the prescribed sets, reps, and weights from the program
-- Add coaching cues specific to the lift and current phase
-- If all lifts are done this week, suggest accessory/supplemental work instead
+## 2. MAIN SESSION
+Depending on the chosen type:
+- **strength**: JM prescribed sets/reps/weights + coaching cues + 2-3 accessories
+- **crossfit**: Pick a WOD from the catalog, show full workout with scaling options
+- **tabata**: 3-4 Tabata blocks with specific exercises, work/rest timing
+- **stretching**: Full-body stretching routine from catalog exercises (15-20 min)
+- **aerobic**: Specific cardio protocol from catalog with phases and RPE targets
 
-## 3. ACCESSORY WORK
-Suggest 2-3 accessory exercises that complement today's main lift:
-- Target weak points and supporting muscle groups
-- Include sets × reps recommendations
-- Keep it brief and phase-appropriate (more volume in accumulation, less in realization)
+## 3. SUPPLEMENTAL WORK (if applicable)
+- For strength days: accessories targeting weak points
+- For CrossFit/Tabata days: brief core or mobility work
+- For aerobic days: light stretching
+- For stretching days: skip this section
 
-${hiitSection ? `## 4. HIIT / CONDITIONING\n${hiitSection}` : ''}
+## 4. COOL-DOWN & STRETCHING (5-10 min)
+- Static stretches from the catalog for muscle groups used today
+- Foam rolling if appropriate
+- Mobility drills for problem areas
 
-## ${hiitSection ? '5' : '4'}. COOL-DOWN & STRETCHING (5-10 min)
-Design a specific cool-down routine:
-- Static stretching for the muscle groups trained today
-- Include hold times (30-60s per stretch)
-- Add mobility work if relevant (hips, thoracic spine, shoulders)
-- Foam rolling recommendations if appropriate
-
-Keep the plan practical, specific, and concise. Use bullet points. No walls of text.
-Every exercise should have specific sets, reps, or duration.
+Keep the plan practical, specific, and concise. Use bullet points.
+Every exercise should have specific sets, reps, weight, or duration.
+Reference exercises from the catalog by name when possible.
 </task>`
 }
