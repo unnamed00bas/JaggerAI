@@ -106,7 +106,7 @@ export function Dashboard() {
         </span>
       </div>
 
-      <Card className="bg-primary-600 dark:bg-primary-800 text-white border-0">
+      <div className="bg-primary-600 dark:bg-primary-800 text-white rounded-2xl p-4 shadow-sm">
         <div className="flex justify-between items-center">
           <div>
             <div className="text-sm opacity-80">{t(`waves.${weekInfo.wave}`)}</div>
@@ -119,7 +119,7 @@ export function Dashboard() {
         <p className="text-sm mt-2 opacity-80">
           {t(`effort.${weekInfo.phase}`)}
         </p>
-      </Card>
+      </div>
 
       {/* Weekly progress */}
       <Card>

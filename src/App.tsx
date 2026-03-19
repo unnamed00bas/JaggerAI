@@ -7,6 +7,7 @@ import { TabataDay } from './components/workout/TabataDay'
 import { CycleOverview } from './components/workout/CycleOverview'
 import { AnalyticsPage } from './components/analytics/AnalyticsPage'
 import { CoachPage } from './components/ai/CoachPage'
+import { WorkoutList } from './components/workout/WorkoutList'
 import { SettingsPage } from './components/settings/SettingsPage'
 
 export function App() {
@@ -18,7 +19,7 @@ export function App() {
         <Route path="/cycle/overview" element={<CycleOverview />} />
         <Route path="/workout/:lift" element={<WorkoutDay />} />
         <Route path="/workout/tabata" element={<TabataDay />} />
-        <Route path="/workout" element={<Dashboard />} />
+        <Route path="/workout" element={<WorkoutList />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/coach" element={<CoachPage />} />
         <Route path="/settings" element={<SettingsPage />} />
