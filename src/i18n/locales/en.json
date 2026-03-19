@@ -109,6 +109,11 @@
     "placeholder": "Ask about your training...",
     "send": "Send",
     "analyzing": "Analyzing your progress...",
+    "analyzing1": "Reviewing your workouts...",
+    "analyzing2": "Preparing recommendations...",
+    "analyzing3": "Evaluating your results...",
+    "analyzing4": "Thinking about advice...",
+    "analyzing5": "Analyzing your trends...",
     "noProvider": "Configure LLM provider in Settings",
     "prompts": {
       "analyzeProgress": "Analyze my progress",

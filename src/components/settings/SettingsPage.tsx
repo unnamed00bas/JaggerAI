@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { Card } from '../ui/Card'
+import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { AuthSection } from './AuthSection'
 import { SyncSection } from './SyncSection'
@@ -10,9 +11,37 @@ export function SettingsPage() {
   const { t, i18n } = useTranslation()
   const settings = useSettingsStore()
   const [saved, setSaved] = useState(false)
+  const [hasChanges, setHasChanges] = useState(false)
+  const initialSnapshot = useRef<string>('')
+
+  function getSnapshot() {
+    const s = useSettingsStore.getState()
+    return JSON.stringify({
+      theme: s.theme,
+      language: s.language,
+      restTimerSeconds: s.restTimerSeconds,
+      variant: s.variant,
+      tabataEnabled: s.tabataEnabled,
+      tabataEquipment: s.tabataEquipment,
+      llmProvider: s.llmProvider,
+      llmBaseUrl: s.llmBaseUrl,
+      llmApiKey: s.llmApiKey,
+      llmModel: s.llmModel,
+    })
+  }
+
+  useEffect(() => {
+    initialSnapshot.current = getSnapshot()
+  }, [])
+
+  function markChanged() {
+    setHasChanges(getSnapshot() !== initialSnapshot.current)
+  }
 
   const showSaved = useCallback(() => {
     setSaved(true)
+    setHasChanges(false)
+    initialSnapshot.current = getSnapshot()
   }, [])
 
   useEffect(() => {
@@ -24,7 +53,7 @@ export function SettingsPage() {
   function handleLanguageChange(lang: 'ru' | 'en') {
     settings.setLanguage(lang)
     i18n.changeLanguage(lang)
-    showSaved()
+    markChanged()
   }
 
   return (
@@ -47,7 +76,7 @@ export function SettingsPage() {
           {(['system', 'light', 'dark'] as const).map((theme) => (
             <button
               key={theme}
-              onClick={() => { settings.setTheme(theme); showSaved() }}
+              onClick={() => { settings.setTheme(theme); markChanged() }}
               className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
                 settings.theme === theme
                   ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
@@ -85,7 +114,7 @@ export function SettingsPage() {
           {[60, 90, 120, 180, 300].map((seconds) => (
             <button
               key={seconds}
-              onClick={() => { settings.setRestTimerSeconds(seconds); showSaved() }}
+              onClick={() => { settings.setRestTimerSeconds(seconds); markChanged() }}
               className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
                 settings.restTimerSeconds === seconds
                   ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
@@ -104,7 +133,7 @@ export function SettingsPage() {
           {(['classic', 'inverted'] as const).map((v) => (
             <button
               key={v}
-              onClick={() => { settings.setVariant(v); showSaved() }}
+              onClick={() => { settings.setVariant(v); markChanged() }}
               className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
                 settings.variant === v
                   ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
@@ -124,7 +153,7 @@ export function SettingsPage() {
             <p className="text-xs text-surface-500 dark:text-surface-400">{t('tabata.settings.enabledDesc')}</p>
           </div>
           <button
-            onClick={() => { settings.setTabataEnabled(!settings.tabataEnabled); showSaved() }}
+            onClick={() => { settings.setTabataEnabled(!settings.tabataEnabled); markChanged() }}
             className={`relative w-12 h-7 rounded-full transition-colors ${
               settings.tabataEnabled
                 ? 'bg-primary-500'
@@ -147,7 +176,7 @@ export function SettingsPage() {
               {(['bodyweight', 'kettlebell', 'cardio_machines', 'mixed'] as const).map((eq) => (
                 <button
                   key={eq}
-                  onClick={() => { settings.setTabataEquipment(eq); showSaved() }}
+                  onClick={() => { settings.setTabataEquipment(eq); markChanged() }}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
                     settings.tabataEquipment === eq
                       ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
@@ -173,7 +202,7 @@ export function SettingsPage() {
               {([['claude', 'Claude'], ['openai', 'OpenAI'], ['glm', 'GLM']] as const).map(([provider, label]) => (
                 <button
                   key={provider}
-                  onClick={() => { settings.setLlmProvider(provider); showSaved() }}
+                  onClick={() => { settings.setLlmProvider(provider); markChanged() }}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
                     settings.llmProvider === provider
                       ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
@@ -191,7 +220,7 @@ export function SettingsPage() {
               label={t('settings.llmBaseUrl')}
               value={settings.llmBaseUrl}
               onChange={(e) => settings.setLlmBaseUrl(e.target.value)}
-              onBlur={showSaved}
+              onBlur={markChanged}
               placeholder="https://open.bigmodel.cn/api/paas/v4"
             />
           )}
@@ -201,7 +230,7 @@ export function SettingsPage() {
             type="password"
             value={settings.llmApiKey}
             onChange={(e) => settings.setLlmApiKey(e.target.value)}
-            onBlur={showSaved}
+            onBlur={markChanged}
             placeholder="sk-..."
           />
 
@@ -209,7 +238,7 @@ export function SettingsPage() {
             label={t('settings.llmModel')}
             value={settings.llmModel}
             onChange={(e) => settings.setLlmModel(e.target.value)}
-            onBlur={showSaved}
+            onBlur={markChanged}
             placeholder={
               settings.llmProvider === 'claude'
                 ? 'claude-sonnet-4-20250514'
@@ -220,6 +249,15 @@ export function SettingsPage() {
           />
         </div>
       </Card>
+
+      <Button
+        size="lg"
+        className="w-full"
+        onClick={showSaved}
+        disabled={!hasChanges && !saved}
+      >
+        {saved ? t('settings.saved') : t('common.save')}
+      </Button>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -30,6 +30,25 @@ export function CoachPage() {
 
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0)
+
+  const loadingMessages = useMemo(() => {
+    const keys = ['coach.analyzing', 'coach.analyzing1', 'coach.analyzing2', 'coach.analyzing3', 'coach.analyzing4', 'coach.analyzing5']
+    // Shuffle on each loading start
+    return keys.sort(() => Math.random() - 0.5)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingMsgIndex(0)
+      return
+    }
+    const interval = setInterval(() => {
+      setLoadingMsgIndex((prev) => (prev + 1) % loadingMessages.length)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [loading, loadingMessages.length])
   const [containerHeight, setContainerHeight] = useState('80vh')
   const scrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -192,9 +211,14 @@ export function CoachPage() {
         ))}
         {loading && (
           <div className="self-start max-w-[85%] rounded-2xl p-3 shadow-sm flex-shrink-0 bg-white dark:bg-surface-800 border border-surface-100 dark:border-surface-700">
-            <p className="text-sm text-surface-500 dark:text-surface-400 animate-pulse">
-              {t('coach.analyzing')}
+            <p className="text-sm text-surface-500 dark:text-surface-400 transition-opacity duration-300">
+              {t(loadingMessages[loadingMsgIndex])}
             </p>
+            <div className="flex gap-1 mt-2">
+              <span className="w-2 h-2 rounded-full bg-surface-400 dark:bg-surface-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 rounded-full bg-surface-400 dark:bg-surface-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 rounded-full bg-surface-400 dark:bg-surface-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
           </div>
         )}
       </div>
