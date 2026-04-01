@@ -1,95 +1,213 @@
-export type Lift = 'squat' | 'bench' | 'ohp' | 'deadlift'
+// ─────────────────────────────────────────────────────────
+// 3-Day Undulating Periodization Program Types
+// 12-week cycle, 3 blocks, 3 training days per week
+// ─────────────────────────────────────────────────────────
 
-export type Wave = '10s' | '8s' | '5s' | '3s'
+// --- Training Day Types ---
 
-export type Phase = 'accumulation' | 'intensification' | 'realization' | 'deload'
+/** Mon = Hypertrophy (6-8), Wed = Volume (10-12), Fri = Strength (3-5) */
+export type TrainingDayType = 'hypertrophy' | 'volume' | 'strength'
 
-export type MethodVariant = 'classic' | 'inverted'
+/** 3 blocks of 4 weeks each */
+export type Block = 1 | 2 | 3
 
-export interface SetPrescription {
-  percentage: number
-  reps: number | 'amrap'
-  isWarmup?: boolean
+export const TRAINING_DAYS: TrainingDayType[] = ['hypertrophy', 'volume', 'strength']
+export const BLOCKS: Block[] = [1, 2, 3]
+export const TOTAL_WEEKS = 12
+export const DELOAD_WEEKS = [4, 8] as const
+export const AMRAP_TEST_WEEK = 12
+
+// --- Exercise Definitions ---
+
+export type ExerciseId =
+  // Day 1 (Hypertrophy) & Day 3 (Strength) compounds
+  | 'squat'
+  | 'bench'
+  | 'barbell_row'
+  | 'ohp'
+  // Day 1 only
+  | 'romanian_deadlift'
+  | 'dumbbell_curl'
+  | 'tricep_pushdown'
+  | 'plank'
+  // Day 2 (Volume) exercises
+  | 'leg_press'
+  | 'pullup'
+  | 'incline_db_press'
+  | 'cable_row'
+  | 'bulgarian_split_squat'
+  | 'lateral_raise'
+  | 'leg_curl'
+  | 'cable_crunch'
+  // Day 3 only
+  | 'deadlift'
+  | 'farmers_walk'
+
+/** Category determines how sets/reps change with periodization */
+export type ExerciseCategory = 'primary' | 'secondary' | 'accessory'
+
+export interface ExerciseDefinition {
+  id: ExerciseId
+  category: ExerciseCategory
+  bodyPart: 'upper' | 'lower' | 'core'
+  isCompound: boolean
+  /** Weight increment on progression (kg) */
+  increment: number
+  /** If true, uses time/distance instead of reps */
+  isTimeBased?: boolean
+  isDistanceBased?: boolean
 }
 
-export interface WorkoutPrescription {
-  wave: Wave
-  phase: Phase
-  lift: Lift
-  sets: SetPrescription[]
-  effortNote: string
+/** All exercises used in the program */
+export const EXERCISES: Record<ExerciseId, ExerciseDefinition> = {
+  squat:                { id: 'squat',                category: 'primary',   bodyPart: 'lower', isCompound: true,  increment: 5 },
+  bench:                { id: 'bench',                category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  barbell_row:          { id: 'barbell_row',          category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  ohp:                  { id: 'ohp',                  category: 'secondary', bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  romanian_deadlift:    { id: 'romanian_deadlift',    category: 'secondary', bodyPart: 'lower', isCompound: true,  increment: 5 },
+  dumbbell_curl:        { id: 'dumbbell_curl',        category: 'accessory', bodyPart: 'upper', isCompound: false, increment: 1.25 },
+  tricep_pushdown:      { id: 'tricep_pushdown',      category: 'accessory', bodyPart: 'upper', isCompound: false, increment: 2.5 },
+  plank:                { id: 'plank',                category: 'accessory', bodyPart: 'core',  isCompound: false, increment: 0, isTimeBased: true },
+  leg_press:            { id: 'leg_press',            category: 'primary',   bodyPart: 'lower', isCompound: true,  increment: 5 },
+  pullup:               { id: 'pullup',               category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  incline_db_press:     { id: 'incline_db_press',     category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  cable_row:            { id: 'cable_row',            category: 'secondary', bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  bulgarian_split_squat:{ id: 'bulgarian_split_squat',category: 'secondary', bodyPart: 'lower', isCompound: true,  increment: 2.5 },
+  lateral_raise:        { id: 'lateral_raise',        category: 'accessory', bodyPart: 'upper', isCompound: false, increment: 1.25 },
+  leg_curl:             { id: 'leg_curl',             category: 'accessory', bodyPart: 'lower', isCompound: false, increment: 2.5 },
+  cable_crunch:         { id: 'cable_crunch',         category: 'accessory', bodyPart: 'core',  isCompound: false, increment: 2.5 },
+  deadlift:             { id: 'deadlift',             category: 'primary',   bodyPart: 'lower', isCompound: true,  increment: 5 },
+  farmers_walk:         { id: 'farmers_walk',         category: 'accessory', bodyPart: 'core',  isCompound: false, increment: 5, isDistanceBased: true },
 }
 
-export interface TrainingMaxes {
+/** Main compound lifts for which user enters 1RM at setup */
+export const MAIN_LIFTS = ['squat', 'bench', 'ohp', 'deadlift'] as const
+export type MainLift = typeof MAIN_LIFTS[number]
+
+/** Exercises for each training day (ordered) */
+export const DAY_EXERCISES: Record<TrainingDayType, ExerciseId[]> = {
+  hypertrophy: ['squat', 'bench', 'barbell_row', 'ohp', 'romanian_deadlift', 'dumbbell_curl', 'tricep_pushdown', 'plank'],
+  volume:      ['leg_press', 'pullup', 'incline_db_press', 'cable_row', 'bulgarian_split_squat', 'lateral_raise', 'leg_curl', 'cable_crunch'],
+  strength:    ['squat', 'deadlift', 'bench', 'ohp', 'barbell_row', 'farmers_walk'],
+}
+
+// --- 1RM & Working Weights ---
+
+export interface OneRepMaxes {
   squat: number
   bench: number
   ohp: number
   deadlift: number
 }
 
+/**
+ * Working weights stored as a flat record.
+ * Keys use format: exerciseId_dayType (e.g. "squat_hypertrophy", "leg_press_volume")
+ */
+export type WorkingWeights = Record<string, number>
+
+/** Helper to create working weight key */
+export function workingWeightKey(exerciseId: string, dayType: TrainingDayType): string {
+  return `${exerciseId}_${dayType}`
+}
+
+// --- Sync Meta ---
+
 export interface SyncMeta {
   updatedAt: string
   _dirty?: number // 1 = needs sync
 }
 
+// --- Cycle Config ---
+
 export interface CycleConfig extends SyncMeta {
   id: string
-  variant: MethodVariant
-  trainingMaxes: TrainingMaxes
+  oneRepMaxes: OneRepMaxes
+  workingWeights: WorkingWeights
   startDate: string
   createdAt: string
 }
 
+// --- Workout Prescriptions ---
+
+export interface ExercisePrescription {
+  exerciseId: ExerciseId
+  sets: number
+  repsMin: number
+  repsMax: number
+  restSeconds: number
+  category: ExerciseCategory
+  isAmrap?: boolean
+  notes?: string // e.g. "per leg", "30-45 sec"
+}
+
+export interface DayPrescription {
+  dayType: TrainingDayType
+  week: number
+  block: Block
+  exercises: ExercisePrescription[]
+  isDeload: boolean
+  isAmrapTest: boolean
+  effortNote: string
+}
+
+// --- Completed Sets & Workout Logs ---
+
 export interface CompletedSet {
   targetWeight: number
-  targetReps: number | 'amrap'
+  targetRepsMin: number
+  targetRepsMax: number
   actualWeight: number
   actualReps: number
+  rpe?: number // 6-10 RPE scale
   completed: boolean
+}
+
+export interface ExerciseLog {
+  exerciseId: string
+  sets: CompletedSet[]
 }
 
 export interface WorkoutLog extends SyncMeta {
   id: string
   cycleId: string
-  lift: Lift
-  wave: Wave
-  phase: Phase
+  dayType: TrainingDayType
   week: number
-  sets: CompletedSet[]
+  block: Block
+  exercises: ExerciseLog[]
   date: string
   notes: string
 }
 
+// --- AMRAP Test Results (Week 12) ---
+
 export interface AmrapResult extends SyncMeta {
   id: string
   cycleId: string
-  lift: Lift
-  wave: Wave
+  exerciseId: string
   weight: number
-  targetReps: number
   actualReps: number
   date: string
   estimatedOneRepMax: number
-  newTrainingMax: number
 }
+
+// --- Week Info ---
 
 export interface WeekInfo {
   weekNumber: number
-  wave: Wave
-  phase: Phase
+  block: Block
+  isDeload: boolean
+  isAmrapTest: boolean
 }
 
-export const LIFTS: Lift[] = ['squat', 'bench', 'ohp', 'deadlift']
+// --- RPE Scale ---
 
-export const WAVES: Wave[] = ['10s', '8s', '5s', '3s']
-
-export const PHASES: Phase[] = ['accumulation', 'intensification', 'realization', 'deload']
-
-export const WAVE_TARGET_REPS: Record<Wave, number> = {
-  '10s': 10,
-  '8s': 8,
-  '5s': 5,
-  '3s': 3,
+export const RPE_DESCRIPTIONS: Record<number, string> = {
+  6: 'rpe.6',
+  7: 'rpe.7',
+  8: 'rpe.8',
+  9: 'rpe.9',
+  10: 'rpe.10',
 }
 
 // --- Workout Types (AI Trainer multi-modal planning) ---
@@ -104,7 +222,7 @@ export interface CrossfitWod {
   id: string
   name: string
   format: CrossfitWodFormat
-  timeCap?: number // minutes
+  timeCap?: number
   rounds?: number
   exercises: CrossfitWodExercise[]
   difficulty: 'beginner' | 'intermediate' | 'advanced'
@@ -114,8 +232,8 @@ export interface CrossfitWod {
 
 export interface CrossfitWodExercise {
   name: string
-  reps: number | string // string for "400m" or "1000m row"
-  weight?: string // e.g. "95/65 lb" or "bodyweight"
+  reps: number | string
+  weight?: string
 }
 
 export interface StretchExercise {
@@ -123,8 +241,8 @@ export interface StretchExercise {
   name: string
   type: 'dynamic' | 'static' | 'mobility'
   targetMuscles: MuscleGroup[]
-  holdSeconds?: number // for static stretches
-  reps?: number // for dynamic stretches
+  holdSeconds?: number
+  reps?: number
   description: string
 }
 
@@ -142,11 +260,11 @@ export interface AerobicWorkout {
 export interface AerobicPhase {
   type: 'work' | 'rest' | 'warmup' | 'cooldown'
   durationSeconds: number
-  intensity: string // e.g. "RPE 6-7", "max effort", "easy pace"
+  intensity: string
   repeats?: number
 }
 
-// --- Tabata Conditioning ---
+// --- Tabata Conditioning (standalone, not tied to cycle) ---
 
 export type TabataEquipment = 'bodyweight' | 'kettlebell' | 'cardio_machines' | 'mixed'
 
@@ -172,15 +290,12 @@ export interface TabataExercise {
 
 export interface TabataBlock {
   exerciseId: TabataExerciseId
-  rounds: number // typically 8 (= 4 min)
-  workSeconds: number // typically 20
-  restSeconds: number // typically 10
+  rounds: number
+  workSeconds: number
+  restSeconds: number
 }
 
 export interface TabataWorkoutPrescription {
-  wave: Wave
-  phase: Phase
-  weekNumber: number
   blocks: TabataBlock[]
   totalMinutes: number
   intensityNote: string
@@ -188,13 +303,10 @@ export interface TabataWorkoutPrescription {
 
 export interface TabataLog extends SyncMeta {
   id: string
-  cycleId: string
-  wave: Wave
-  phase: Phase
-  week: number
+  cycleId?: string
   blocks: TabataCompletedBlock[]
   date: string
-  rpe: number // 1-10
+  rpe: number
   notes: string
 }
 

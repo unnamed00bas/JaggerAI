@@ -8,7 +8,7 @@ import { db } from '../../lib/db'
 import { getProvider } from '../../lib/llm'
 import { buildCoachSystemPrompt } from '../../lib/llm/coachPrompt'
 import type { LlmMessage } from '../../lib/llm'
-import type { AmrapResult, WorkoutLog, TabataLog } from '../../types'
+import type { AmrapResult, WorkoutLog } from '../../types'
 import { Button } from '../ui/Button'
 import { MarkdownMessage } from '../ui/MarkdownMessage'
 
@@ -91,10 +91,8 @@ export function CoachPage() {
   )
 
   const tabataLogs = useLiveQuery(
-    () => (activeCycleId
-      ? db.tabataLogs.where('cycleId').equals(activeCycleId).sortBy('date')
-      : Promise.resolve([] as TabataLog[])),
-    [activeCycleId],
+    () => db.tabataLogs.toArray(),
+    [],
   )
 
   useEffect(() => {
@@ -168,7 +166,8 @@ export function CoachPage() {
     { key: 'analyzeProgress', label: t('coach.prompts.analyzeProgress') },
     { key: 'weakPoints', label: t('coach.prompts.weakPoints') },
     { key: 'recovery', label: t('coach.prompts.recovery') },
-    { key: 'adjustTm', label: t('coach.prompts.adjustTm') },
+    { key: 'nutrition', label: t('coach.prompts.nutrition') },
+    { key: 'adjustWeights', label: t('coach.prompts.adjustWeights') },
   ]
 
   return (

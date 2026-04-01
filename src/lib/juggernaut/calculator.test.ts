@@ -1,23 +1,33 @@
 import { describe, it, expect } from 'vitest'
 import {
   roundWeight,
-  calculateTrainingMax,
   estimateOneRepMax,
-  calculateNewTrainingMax,
-  getWorkoutPrescription,
-  getWeightForSet,
+  calculateInitialWorkingWeights,
+  getDayPrescription,
+  getExerciseWeight,
   getCycleWeeks,
-  generateFullCycle,
+  getBlock,
+  isDeloadWeek,
+  isAmrapTestWeek,
+  shouldProgress,
 } from './calculator'
+import type { OneRepMaxes } from '../../types'
+
+const TEST_MAXES: OneRepMaxes = {
+  squat: 180,
+  bench: 100,
+  ohp: 60,
+  deadlift: 200,
+}
 
 describe('roundWeight', () => {
   it('rounds to nearest 2.5 kg', () => {
     expect(roundWeight(100)).toBe(100)
     expect(roundWeight(101)).toBe(100)
-    expect(roundWeight(101.25)).toBe(102.5) // 101.25 is exactly between 100 and 102.5, rounds up
+    expect(roundWeight(101.25)).toBe(102.5)
     expect(roundWeight(101.5)).toBe(102.5)
     expect(roundWeight(103.75)).toBe(105)
-    expect(roundWeight(98.7)).toBe(97.5) // 98.7 is closer to 97.5 than 100
+    expect(roundWeight(98.7)).toBe(97.5)
   })
 
   it('handles exact multiples', () => {
@@ -26,20 +36,10 @@ describe('roundWeight', () => {
   })
 })
 
-describe('calculateTrainingMax', () => {
-  it('calculates 90% of 1RM and rounds', () => {
-    expect(calculateTrainingMax(100)).toBe(90)
-    expect(calculateTrainingMax(150)).toBe(135)
-    expect(calculateTrainingMax(200)).toBe(180)
-    expect(calculateTrainingMax(143)).toBe(127.5) // 143 * 0.9 = 128.7 -> 127.5
-  })
-})
-
 describe('estimateOneRepMax', () => {
   it('uses Epley formula and rounds', () => {
-    // weight * (1 + reps/30)
-    expect(estimateOneRepMax(100, 10)).toBe(132.5) // 100 * (1 + 10/30) = 133.33 -> 132.5
-    expect(estimateOneRepMax(80, 8)).toBe(102.5) // 80 * (1 + 8/30) = 101.33 -> 102.5
+    expect(estimateOneRepMax(100, 10)).toBe(132.5)
+    expect(estimateOneRepMax(80, 8)).toBe(102.5)
   })
 
   it('returns weight for 1 rep', () => {
@@ -51,179 +51,161 @@ describe('estimateOneRepMax', () => {
   })
 })
 
-describe('calculateNewTrainingMax', () => {
-  it('adds increment per extra rep for upper body', () => {
-    // Bench: 1.25 kg per extra rep over target
-    // 10s wave, target = 10, actual = 16, extras = 6
-    // New TM = 100 + 6 * 1.25 = 107.5
-    expect(calculateNewTrainingMax(100, '10s', 16, 'bench')).toBe(107.5)
+describe('calculateInitialWorkingWeights', () => {
+  it('calculates working weights for main lifts', () => {
+    const weights = calculateInitialWorkingWeights(TEST_MAXES)
+
+    // squat hypertrophy = 180 * 0.70 = 126 → 125
+    expect(weights['squat_hypertrophy']).toBe(125)
+    // squat strength = 180 * 0.80 = 144 → 145
+    expect(weights['squat_strength']).toBe(145)
+
+    // bench hypertrophy = 100 * 0.70 = 70
+    expect(weights['bench_hypertrophy']).toBe(70)
+
+    // squat is NOT on volume day, so no squat_volume key
+    expect(weights['squat_volume']).toBeUndefined()
   })
 
-  it('adds increment per extra rep for lower body', () => {
-    // Squat: 2.5 kg per extra rep over target
-    // 10s wave, target = 10, actual = 15, extras = 5
-    // New TM = 180 + 5 * 2.5 = 192.5
-    expect(calculateNewTrainingMax(180, '10s', 15, 'squat')).toBe(192.5)
-  })
+  it('includes accessory exercise weights', () => {
+    const weights = calculateInitialWorkingWeights(TEST_MAXES)
 
-  it('does not decrease TM if reps equal target', () => {
-    expect(calculateNewTrainingMax(100, '8s', 8, 'bench')).toBe(100)
-  })
-
-  it('does not decrease TM if reps below target', () => {
-    expect(calculateNewTrainingMax(100, '5s', 3, 'deadlift')).toBe(100)
-  })
-
-  it('works for 3s wave', () => {
-    // Deadlift: 2.5 kg per extra rep, target 3, actual 7, extras = 4
-    // 200 + 4 * 2.5 = 210
-    expect(calculateNewTrainingMax(200, '3s', 7, 'deadlift')).toBe(210)
+    // Accessories should have non-zero weights
+    expect(weights['dumbbell_curl_hypertrophy']).toBeGreaterThan(0)
+    expect(weights['plank_hypertrophy']).toBeGreaterThan(0)
   })
 })
 
-describe('getWorkoutPrescription', () => {
-  const tm = 100
+describe('getDayPrescription', () => {
+  const weights = calculateInitialWorkingWeights(TEST_MAXES)
 
-  describe('accumulation phase', () => {
-    it('classic 10s wave: 5 sets of 10 at 60%', () => {
-      const workout = getWorkoutPrescription('10s', 'accumulation', 'squat', tm, 'classic')
-      expect(workout.sets).toHaveLength(5)
-      expect(workout.sets[0].percentage).toBe(0.6)
-      expect(workout.sets[0].reps).toBe(10)
-    })
-
-    it('classic 8s wave: 5 sets of 8 at 65%', () => {
-      const workout = getWorkoutPrescription('8s', 'accumulation', 'bench', tm, 'classic')
-      expect(workout.sets).toHaveLength(5)
-      expect(workout.sets[0].percentage).toBe(0.65)
-      expect(workout.sets[0].reps).toBe(8)
-    })
-
-    it('classic 5s wave: 6 sets of 5 at 70%', () => {
-      const workout = getWorkoutPrescription('5s', 'accumulation', 'ohp', tm, 'classic')
-      expect(workout.sets).toHaveLength(6)
-      expect(workout.sets[0].percentage).toBe(0.7)
-      expect(workout.sets[0].reps).toBe(5)
-    })
-
-    it('classic 3s wave: 7 sets of 3 at 75%', () => {
-      const workout = getWorkoutPrescription('3s', 'accumulation', 'deadlift', tm, 'classic')
-      expect(workout.sets).toHaveLength(7)
-      expect(workout.sets[0].percentage).toBe(0.75)
-      expect(workout.sets[0].reps).toBe(3)
-    })
-
-    it('inverted 10s wave: 10 sets of 5 at 60%', () => {
-      const workout = getWorkoutPrescription('10s', 'accumulation', 'squat', tm, 'inverted')
-      expect(workout.sets).toHaveLength(10)
-      expect(workout.sets[0].reps).toBe(5)
-      expect(workout.sets[0].percentage).toBe(0.6)
-    })
-
-    it('inverted 8s wave: 8 sets of 5 at 65%', () => {
-      const workout = getWorkoutPrescription('8s', 'accumulation', 'bench', tm, 'inverted')
-      expect(workout.sets).toHaveLength(8)
-      expect(workout.sets[0].reps).toBe(5)
-    })
-
-    it('inverted 5s wave: 5 sets of 6 at 70%', () => {
-      const workout = getWorkoutPrescription('5s', 'accumulation', 'ohp', tm, 'inverted')
-      expect(workout.sets).toHaveLength(5)
-      expect(workout.sets[0].reps).toBe(6)
-    })
-
-    it('inverted 3s wave: 3 sets of 7 at 75%', () => {
-      const workout = getWorkoutPrescription('3s', 'accumulation', 'deadlift', tm, 'inverted')
-      expect(workout.sets).toHaveLength(3)
-      expect(workout.sets[0].reps).toBe(7)
-    })
+  it('returns exercises for hypertrophy day', () => {
+    const rx = getDayPrescription(1, 'hypertrophy', weights)
+    expect(rx.dayType).toBe('hypertrophy')
+    expect(rx.week).toBe(1)
+    expect(rx.block).toBe(1)
+    expect(rx.exercises.length).toBeGreaterThan(0)
   })
 
-  describe('intensification phase', () => {
-    it('10s wave: warmups + 3x10 at 67.5%', () => {
-      const workout = getWorkoutPrescription('10s', 'intensification', 'squat', tm)
-      expect(workout.sets).toHaveLength(5) // 2 warmup + 3 work
-      expect(workout.sets[0].isWarmup).toBe(true)
-      expect(workout.sets[0].percentage).toBe(0.55)
-      expect(workout.sets[2].percentage).toBe(0.675)
-      expect(workout.sets[2].reps).toBe(10)
-    })
-
-    it('3s wave: warmups + 5x3 at 82.5%', () => {
-      const workout = getWorkoutPrescription('3s', 'intensification', 'deadlift', tm)
-      expect(workout.sets).toHaveLength(7) // 2 warmup + 5 work
-      expect(workout.sets[2].percentage).toBe(0.825)
-      expect(workout.sets[2].reps).toBe(3)
-    })
+  it('marks deload weeks', () => {
+    const rx = getDayPrescription(4, 'strength', weights)
+    expect(rx.isDeload).toBe(true)
   })
 
-  describe('realization phase', () => {
-    it('10s wave: 3 ramping + AMRAP at 75%', () => {
-      const workout = getWorkoutPrescription('10s', 'realization', 'bench', tm)
-      expect(workout.sets).toHaveLength(4)
-      const amrapSet = workout.sets[workout.sets.length - 1]
-      expect(amrapSet.percentage).toBe(0.75)
-      expect(amrapSet.reps).toBe('amrap')
-    })
-
-    it('3s wave: 6 ramping + AMRAP at 90%', () => {
-      const workout = getWorkoutPrescription('3s', 'realization', 'squat', tm)
-      expect(workout.sets).toHaveLength(7)
-      const amrapSet = workout.sets[workout.sets.length - 1]
-      expect(amrapSet.percentage).toBe(0.90)
-      expect(amrapSet.reps).toBe('amrap')
-    })
+  it('marks AMRAP test week for non-volume days', () => {
+    const rx = getDayPrescription(12, 'strength', weights)
+    expect(rx.isAmrapTest).toBe(true)
   })
 
-  describe('deload phase', () => {
-    it('has 3 sets at 40%, 50%, 60%', () => {
-      const workout = getWorkoutPrescription('10s', 'deload', 'ohp', tm)
-      expect(workout.sets).toHaveLength(3)
-      expect(workout.sets[0].percentage).toBe(0.4)
-      expect(workout.sets[1].percentage).toBe(0.5)
-      expect(workout.sets[2].percentage).toBe(0.6)
-      expect(workout.sets.every(s => s.reps === 5)).toBe(true)
-    })
+  it('does not mark AMRAP for volume day', () => {
+    const rx = getDayPrescription(12, 'volume', weights)
+    expect(rx.isAmrapTest).toBe(false)
+  })
+
+  it('has primary exercises with correct rep ranges for week 1 hypertrophy', () => {
+    const rx = getDayPrescription(1, 'hypertrophy', weights)
+    const squat = rx.exercises.find(e => e.exerciseId === 'squat')
+    expect(squat).toBeDefined()
+    expect(squat!.sets).toBe(3)
+    expect(squat!.repsMin).toBe(6)
+    expect(squat!.repsMax).toBe(8)
+  })
+
+  it('has effort note', () => {
+    const rx = getDayPrescription(1, 'hypertrophy', weights)
+    expect(rx.effortNote).toBeTruthy()
   })
 })
 
-describe('getWeightForSet', () => {
-  it('calculates weight from TM and percentage', () => {
-    expect(getWeightForSet(100, 0.6)).toBe(60)
-    expect(getWeightForSet(135, 0.675)).toBe(90) // 91.125 -> 90
-    expect(getWeightForSet(180, 0.775)).toBe(140) // 139.5 -> 140
+describe('getExerciseWeight', () => {
+  const weights = calculateInitialWorkingWeights(TEST_MAXES)
+
+  it('returns working weight for normal weeks', () => {
+    const w = getExerciseWeight('squat', 'hypertrophy', 1, weights)
+    expect(w).toBe(weights['squat_hypertrophy'])
+  })
+
+  it('reduces weight during deload weeks', () => {
+    const normal = getExerciseWeight('squat', 'hypertrophy', 1, weights)
+    const deload = getExerciseWeight('squat', 'hypertrophy', 4, weights)
+    expect(deload).toBeLessThan(normal)
   })
 })
 
 describe('getCycleWeeks', () => {
-  it('returns 16 weeks', () => {
+  it('returns 12 weeks', () => {
     const weeks = getCycleWeeks()
-    expect(weeks).toHaveLength(16)
+    expect(weeks).toHaveLength(12)
   })
 
-  it('starts with 10s accumulation', () => {
+  it('first week is block 1', () => {
     const weeks = getCycleWeeks()
-    expect(weeks[0]).toEqual({ weekNumber: 1, wave: '10s', phase: 'accumulation' })
+    expect(weeks[0]).toEqual({
+      weekNumber: 1,
+      block: 1,
+      isDeload: false,
+      isAmrapTest: false,
+    })
   })
 
-  it('ends with 3s deload', () => {
+  it('week 4 is deload', () => {
     const weeks = getCycleWeeks()
-    expect(weeks[15]).toEqual({ weekNumber: 16, wave: '3s', phase: 'deload' })
+    expect(weeks[3].isDeload).toBe(true)
   })
 
-  it('has correct wave/phase progression', () => {
+  it('week 12 is AMRAP test', () => {
     const weeks = getCycleWeeks()
-    expect(weeks[4]).toEqual({ weekNumber: 5, wave: '8s', phase: 'accumulation' })
-    expect(weeks[10]).toEqual({ weekNumber: 11, wave: '5s', phase: 'realization' })
+    expect(weeks[11].isAmrapTest).toBe(true)
+  })
+
+  it('has correct block progression', () => {
+    const weeks = getCycleWeeks()
+    expect(weeks[0].block).toBe(1)
+    expect(weeks[4].block).toBe(2)
+    expect(weeks[8].block).toBe(3)
   })
 })
 
-describe('generateFullCycle', () => {
-  it('generates 16 weeks with 4 workouts each', () => {
-    const tms = { squat: 180, bench: 100, ohp: 60, deadlift: 200 }
-    const { weeks, workouts } = generateFullCycle(tms, 'classic')
-    expect(weeks).toHaveLength(16)
-    expect(workouts).toHaveLength(16)
-    expect(workouts[0]).toHaveLength(4)
+describe('getBlock', () => {
+  it('returns correct block for each week range', () => {
+    expect(getBlock(1)).toBe(1)
+    expect(getBlock(4)).toBe(1)
+    expect(getBlock(5)).toBe(2)
+    expect(getBlock(8)).toBe(2)
+    expect(getBlock(9)).toBe(3)
+    expect(getBlock(12)).toBe(3)
+  })
+})
+
+describe('isDeloadWeek', () => {
+  it('identifies deload weeks', () => {
+    expect(isDeloadWeek(4)).toBe(true)
+    expect(isDeloadWeek(8)).toBe(true)
+    expect(isDeloadWeek(1)).toBe(false)
+    expect(isDeloadWeek(12)).toBe(false)
+  })
+})
+
+describe('isAmrapTestWeek', () => {
+  it('identifies AMRAP test week', () => {
+    expect(isAmrapTestWeek(12)).toBe(true)
+    expect(isAmrapTestWeek(11)).toBe(false)
+  })
+})
+
+describe('shouldProgress', () => {
+  it('returns false with less than 2 logs', () => {
+    expect(shouldProgress('squat', 'hypertrophy', [])).toBe(false)
+    expect(shouldProgress('squat', 'hypertrophy', [{
+      exercises: [{ exerciseId: 'squat', sets: [{ actualReps: 8, targetRepsMax: 8, completed: true }] }],
+    }])).toBe(false)
+  })
+
+  it('returns true when upper reps hit 2 sessions in a row', () => {
+    const logs = [
+      { exercises: [{ exerciseId: 'squat', sets: [{ actualReps: 8, targetRepsMax: 8, completed: true }, { actualReps: 8, targetRepsMax: 8, completed: true }] }] },
+      { exercises: [{ exerciseId: 'squat', sets: [{ actualReps: 8, targetRepsMax: 8, completed: true }, { actualReps: 8, targetRepsMax: 8, completed: true }] }] },
+    ]
+    expect(shouldProgress('squat', 'hypertrophy', logs)).toBe(true)
   })
 })

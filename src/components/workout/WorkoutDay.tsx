@@ -4,44 +4,32 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCycleStore } from '../../stores/cycleStore'
 import { useWorkoutStore } from '../../stores/workoutStore'
-import { useSettingsStore } from '../../stores/settingsStore'
 import { useRestTimer } from '../../hooks/useRestTimer'
 import { db } from '../../lib/db'
-import { getCycleWeeks, getWorkoutPrescription, getWeightForSet } from '../../lib/juggernaut'
-import { generateAmrapInsight } from '../../lib/llm'
+import { getDayPrescription, getExerciseWeight, getBlock, estimateOneRepMax } from '../../lib/juggernaut'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
-import type { Lift, CompletedSet, AmrapResult } from '../../types'
-import { WAVE_TARGET_REPS } from '../../types'
+import type { TrainingDayType, CompletedSet, ExerciseLog, AmrapResult } from '../../types'
+import { EXERCISES } from '../../types'
 
 export function WorkoutDay() {
   const { t } = useTranslation()
-  const { lift: liftParam } = useParams<{ lift: string }>()
+  const { dayType: dayTypeParam } = useParams<{ dayType: string }>()
   const navigate = useNavigate()
-  const lift = liftParam as Lift
+  const dayType = dayTypeParam as TrainingDayType
 
   const activeCycleId = useCycleStore((s) => s.activeCycleId)
   const currentWeek = useCycleStore((s) => s.currentWeek)
-  const updateTrainingMax = useCycleStore((s) => s.updateTrainingMax)
-  const variant = useSettingsStore((s) => s.variant)
-  const restTimerSeconds = useSettingsStore((s) => s.restTimerSeconds)
 
   const activeWorkout = useWorkoutStore((s) => s.activeWorkout)
   const startWorkout = useWorkoutStore((s) => s.startWorkout)
-  const updateSet = useWorkoutStore((s) => s.updateSet)
+  const updateExerciseSet = useWorkoutStore((s) => s.updateExerciseSet)
   const finishWorkout = useWorkoutStore((s) => s.finishWorkout)
 
   const { secondsLeft, isRunning, start: startTimer } = useRestTimer()
-  const llmProvider = useSettingsStore((s) => s.llmProvider)
-  const llmApiKey = useSettingsStore((s) => s.llmApiKey)
-  const llmModel = useSettingsStore((s) => s.llmModel)
-  const llmBaseUrl = useSettingsStore((s) => s.llmBaseUrl)
-  const language = useSettingsStore((s) => s.language)
 
-  const [amrapReps, setAmrapReps] = useState('')
   const [notes, setNotes] = useState('')
-  const [insight, setInsight] = useState<string | null>(null)
-  const [insightLoading, setInsightLoading] = useState(false)
+  const [expandedExercise, setExpandedExercise] = useState<number>(0)
   const workoutFinishedRef = useRef(false)
 
   const cycle = useLiveQuery(
@@ -49,108 +37,85 @@ export function WorkoutDay() {
     [activeCycleId],
   )
 
-  const amrapResults = useLiveQuery(
-    () => (activeCycleId
-      ? db.amrapResults.where('cycleId').equals(activeCycleId).sortBy('date')
-      : Promise.resolve([] as AmrapResult[])),
-    [activeCycleId],
-  )
-
-  const weeks = getCycleWeeks()
-  const weekInfo = weeks[currentWeek - 1]
+  const block = getBlock(currentWeek)
 
   useEffect(() => {
-    if (!cycle || !weekInfo || activeWorkout || workoutFinishedRef.current) return
+    if (!cycle || activeWorkout || workoutFinishedRef.current) return
 
-    const tm = cycle.trainingMaxes[lift]
-    const prescription = getWorkoutPrescription(weekInfo.wave, weekInfo.phase, lift, tm, variant)
-
-    const sets: CompletedSet[] = prescription.sets.map((s) => ({
-      targetWeight: getWeightForSet(tm, s.percentage),
-      targetReps: s.reps,
-      actualWeight: getWeightForSet(tm, s.percentage),
-      actualReps: s.reps === 'amrap' ? 0 : s.reps,
-      completed: false,
-    }))
+    const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights)
+    const exercises: ExerciseLog[] = prescription.exercises.map((ex) => {
+      const weight = getExerciseWeight(ex.exerciseId, dayType, currentWeek, cycle.workingWeights)
+      const sets: CompletedSet[] = Array.from({ length: ex.sets }, () => ({
+        targetWeight: weight,
+        targetRepsMin: ex.repsMin,
+        targetRepsMax: ex.repsMax,
+        actualWeight: weight,
+        actualReps: ex.isAmrap ? 0 : ex.repsMin,
+        completed: false,
+      }))
+      return { exerciseId: ex.exerciseId, sets }
+    })
 
     startWorkout({
       cycleId: cycle.id,
-      lift,
-      wave: weekInfo.wave,
-      phase: weekInfo.phase,
+      dayType,
       week: currentWeek,
-      sets,
+      block,
+      exercises,
     })
-  }, [cycle, weekInfo, lift, activeWorkout, variant, currentWeek, startWorkout])
+  }, [cycle, dayType, activeWorkout, currentWeek, block, startWorkout])
 
-  if (!cycle || !weekInfo || !activeWorkout) return null
+  if (!cycle || !activeWorkout) return null
 
-  const prescription = getWorkoutPrescription(weekInfo.wave, weekInfo.phase, lift, cycle.trainingMaxes[lift], variant)
+  const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights)
 
-  function handleSetComplete(index: number) {
-    const set = activeWorkout!.sets[index]
-    updateSet(index, { completed: !set.completed })
+  function handleSetComplete(exerciseIdx: number, setIdx: number) {
+    const set = activeWorkout!.exercises[exerciseIdx].sets[setIdx]
+    updateExerciseSet(exerciseIdx, setIdx, { completed: !set.completed })
     if (!set.completed) {
-      startTimer(restTimerSeconds)
+      const restSeconds = prescription.exercises[exerciseIdx]?.restSeconds ?? 120
+      startTimer(restSeconds)
     }
   }
 
   async function handleFinish() {
     workoutFinishedRef.current = true
-    const isAmrapWorkout = weekInfo!.phase === 'realization' && amrapReps
-    let newTM: number | undefined
 
-    if (isAmrapWorkout) {
-      newTM = await updateTrainingMax(
-        cycle!.id,
-        lift,
-        weekInfo!.wave,
-        Number(amrapReps),
-      )
-    }
-    await finishWorkout(notes)
+    // Save AMRAP results if this is test week
+    if (prescription.isAmrapTest) {
+      for (const exercise of activeWorkout!.exercises) {
+        const prescEx = prescription.exercises.find(e => e.exerciseId === exercise.exerciseId)
+        if (!prescEx?.isAmrap) continue
 
-    // Auto-generate AI insight after AMRAP if LLM is configured
-    if (isAmrapWorkout && llmProvider && llmApiKey && newTM !== undefined) {
-      setInsightLoading(true)
-      const amrapSet = activeWorkout!.sets.find((s) => s.targetReps === 'amrap')
-      const weight = amrapSet?.actualWeight ?? 0
-      const targetReps = WAVE_TARGET_REPS[weekInfo!.wave]
-      try {
-        const result = await generateAmrapInsight({
-          lift,
-          wave: weekInfo!.wave,
-          weight,
-          targetReps,
-          actualReps: Number(amrapReps),
-          oldTM: cycle!.trainingMaxes[lift],
-          newTM,
-          trainingMaxes: cycle!.trainingMaxes,
-          cycle: cycle!,
-          amrapResults: amrapResults ?? [],
-          provider: llmProvider,
-          apiKey: llmApiKey,
-          model: llmModel,
-          baseUrl: llmBaseUrl || undefined,
-          language,
-        })
-        setInsight(result)
-      } catch {
-        // Silently fail — insight is non-critical
-      } finally {
-        setInsightLoading(false)
+        const amrapSet = exercise.sets.find(s => s.actualReps > 0)
+        if (!amrapSet) continue
+
+        const result: AmrapResult = {
+          id: crypto.randomUUID(),
+          cycleId: cycle!.id,
+          exerciseId: exercise.exerciseId,
+          weight: amrapSet.actualWeight,
+          actualReps: amrapSet.actualReps,
+          date: new Date().toISOString(),
+          estimatedOneRepMax: estimateOneRepMax(amrapSet.actualWeight, amrapSet.actualReps),
+          updatedAt: new Date().toISOString(),
+          _dirty: 1,
+        }
+        await db.amrapResults.add(result)
       }
-      return
     }
 
+    await finishWorkout(notes)
     navigate('/')
   }
 
-  const allDone = activeWorkout.sets.every((s) => s.completed)
-  const isRealization = weekInfo.phase === 'realization'
+  const allDone = activeWorkout.exercises.every((ex) =>
+    ex.sets.every((s) => s.completed),
+  )
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <button onClick={() => navigate('/')} className="text-surface-500">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -158,13 +123,14 @@ export function WorkoutDay() {
           </svg>
         </button>
         <div>
-          <h1 className="text-xl font-bold">{t(`lifts.${lift}`)}</h1>
+          <h1 className="text-xl font-bold">{t(`dayTypes.${dayType}Short`)}</h1>
           <p className="text-sm text-surface-500 dark:text-surface-400">
-            {t(`waves.${weekInfo.wave}`)} — {t(`phases.${weekInfo.phase}`)}
+            {t(`blocks.short${block}`)} — {t('cycle.week', { number: currentWeek })}
           </p>
         </div>
       </div>
 
+      {/* Rest Timer */}
       {isRunning && (
         <Card className="bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-700 text-center">
           <div className="text-sm text-primary-600 dark:text-primary-400">{t('workout.restTimer')}</div>
@@ -174,73 +140,151 @@ export function WorkoutDay() {
         </Card>
       )}
 
+      {/* Exercise List */}
       <div className="flex flex-col gap-3">
-        {activeWorkout.sets.map((set, i) => {
-          const prescriptionSet = prescription.sets[i]
-          const isAmrap = prescriptionSet?.reps === 'amrap'
+        {activeWorkout.exercises.map((exerciseLog, exIdx) => {
+          const prescEx = prescription.exercises[exIdx]
+          if (!prescEx) return null
+
+          const def = EXERCISES[prescEx.exerciseId]
+          const exerciseDone = exerciseLog.sets.every(s => s.completed)
+          const completedSets = exerciseLog.sets.filter(s => s.completed).length
+          const isExpanded = expandedExercise === exIdx
 
           return (
             <Card
-              key={i}
-              className={`flex items-center justify-between transition-opacity ${set.completed ? 'opacity-60' : ''}`}
+              key={exIdx}
+              className={exerciseDone ? 'opacity-60' : ''}
             >
-              <div className="flex-1">
+              {/* Exercise header - clickable to expand/collapse */}
+              <button
+                className="w-full flex items-center justify-between"
+                onClick={() => setExpandedExercise(isExpanded ? -1 : exIdx)}
+              >
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-surface-500 dark:text-surface-400">
-                    {t('workout.set', { number: i + 1 })}
-                  </span>
-                  {prescriptionSet?.isWarmup && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-surface-100 dark:bg-surface-700 text-surface-500">
-                      {t('workout.warmup')}
-                    </span>
+                  {exerciseDone ? (
+                    <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <span className="text-xs font-bold text-surface-400 w-5 text-center">{exIdx + 1}</span>
                   )}
-                  {isAmrap && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-bold">
-                      {t('workout.amrap')}
-                    </span>
-                  )}
+                  <div className="text-left">
+                    <div className="font-semibold text-sm">{t(`exercises.${prescEx.exerciseId}`)}</div>
+                    <div className="text-xs text-surface-500 dark:text-surface-400">
+                      {prescEx.isAmrap
+                        ? `AMRAP @ ${exerciseLog.sets[0]?.targetWeight} ${t('common.kg')}`
+                        : def?.isTimeBased
+                          ? `${prescEx.sets}×${prescEx.notes ?? `${prescEx.repsMin}s`}`
+                          : def?.isDistanceBased
+                            ? `${prescEx.sets}×${prescEx.notes ?? `${prescEx.repsMin}m`}`
+                            : `${prescEx.sets}×${prescEx.repsMin}${prescEx.repsMin !== prescEx.repsMax ? `-${prescEx.repsMax}` : ''} @ ${exerciseLog.sets[0]?.targetWeight} ${t('common.kg')}`}
+                      {prescEx.notes === 'exercises.perLeg' ? ` (${t('exercises.perLeg')})` : ''}
+                      {!exerciseDone ? ` — ${completedSets}/${prescEx.sets}` : ''}
+                    </div>
+                  </div>
                 </div>
-                <div className="font-semibold mt-1">
-                  {set.targetWeight} {t('common.kg')} ×{' '}
-                  {isAmrap ? 'AMRAP' : set.targetReps}
-                </div>
-              </div>
-
-              {isAmrap ? (
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder={t('workout.actualReps')}
-                  value={amrapReps}
-                  onChange={(e) => {
-                    setAmrapReps(e.target.value)
-                    if (e.target.value) {
-                      updateSet(i, { actualReps: Number(e.target.value), completed: true })
-                    }
-                  }}
-                  className="w-20 px-3 py-2 text-center rounded-xl border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-lg font-bold"
-                />
-              ) : (
-                <button
-                  onClick={() => handleSetComplete(i)}
-                  className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-colors ${
-                    set.completed
-                      ? 'bg-green-500 border-green-500 text-white'
-                      : 'border-surface-300 dark:border-surface-600'
-                  }`}
+                <svg
+                  className={`w-4 h-4 text-surface-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
                 >
-                  {set.completed && (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Expanded sets */}
+              {isExpanded && (
+                <div className="mt-3 flex flex-col gap-2">
+                  {exerciseLog.sets.map((set, setIdx) => (
+                    <div
+                      key={setIdx}
+                      className={`flex items-center justify-between p-2 rounded-lg ${
+                        set.completed
+                          ? 'bg-green-50 dark:bg-green-900/20'
+                          : 'bg-surface-50 dark:bg-surface-800'
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-surface-500">
+                            {t('workout.set', { number: setIdx + 1 })}
+                          </span>
+                          {prescEx.isAmrap && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-bold">
+                              AMRAP
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm font-semibold mt-0.5">
+                          {set.targetWeight > 0 ? `${set.targetWeight} ${t('common.kg')}` : ''}{' '}
+                          {prescEx.isAmrap
+                            ? '× max'
+                            : def?.isTimeBased
+                              ? `× ${set.targetRepsMin}s`
+                              : def?.isDistanceBased
+                                ? `× ${set.targetRepsMin}m`
+                                : `× ${set.targetRepsMin}${set.targetRepsMin !== set.targetRepsMax ? `-${set.targetRepsMax}` : ''}`}
+                        </div>
+                      </div>
+
+                      {prescEx.isAmrap ? (
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          placeholder={t('workout.actualReps')}
+                          value={set.actualReps || ''}
+                          onChange={(e) => {
+                            const reps = Number(e.target.value)
+                            updateExerciseSet(exIdx, setIdx, {
+                              actualReps: reps,
+                              completed: reps > 0,
+                            })
+                          }}
+                          className="w-20 px-3 py-2 text-center rounded-xl border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-lg font-bold"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          {/* Reps input for adjusting */}
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            value={set.actualReps}
+                            onChange={(e) => {
+                              updateExerciseSet(exIdx, setIdx, { actualReps: Number(e.target.value) })
+                            }}
+                            className="w-14 px-2 py-1 text-center rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-sm"
+                          />
+                          <button
+                            onClick={() => handleSetComplete(exIdx, setIdx)}
+                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors ${
+                              set.completed
+                                ? 'bg-green-500 border-green-500 text-white'
+                                : 'border-surface-300 dark:border-surface-600'
+                            }`}
+                          >
+                            {set.completed && (
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </Card>
           )
         })}
       </div>
 
+      {/* Notes */}
       <Card className="mt-2">
         <textarea
           placeholder={t('workout.notes')}
@@ -251,38 +295,19 @@ export function WorkoutDay() {
         />
       </Card>
 
+      {/* Effort note */}
       <p className="text-sm text-center text-surface-500 dark:text-surface-400 italic">
-        {t(`effort.${weekInfo.phase}`)}
+        {t(prescription.effortNote)}
       </p>
 
       <Button
         size="lg"
         className="w-full"
         onClick={handleFinish}
-        disabled={!allDone || (isRealization && !amrapReps)}
+        disabled={!allDone}
       >
         {t('workout.finish')}
       </Button>
-
-      {(insightLoading || insight) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="max-w-sm w-full">
-            <h3 className="font-semibold mb-2">{t('coach.insight.title')}</h3>
-            {insightLoading ? (
-              <p className="text-sm text-surface-500 dark:text-surface-400 animate-pulse">
-                {t('coach.insight.generating')}
-              </p>
-            ) : (
-              <>
-                <p className="text-sm whitespace-pre-wrap mb-4">{insight}</p>
-                <Button className="w-full" onClick={() => navigate('/')}>
-                  {t('coach.insight.dismiss')}
-                </Button>
-              </>
-            )}
-          </Card>
-        </div>
-      )}
     </div>
   )
 }

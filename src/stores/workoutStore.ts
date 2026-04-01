@@ -1,15 +1,14 @@
 import { create } from 'zustand'
-import type { CompletedSet, WorkoutLog, Lift, Wave, Phase } from '../types'
+import type { CompletedSet, ExerciseLog, WorkoutLog, TrainingDayType, Block } from '../types'
 import { db } from '../lib/db'
 import { useSyncStore } from './syncStore'
 
 interface ActiveWorkout {
   cycleId: string
-  lift: Lift
-  wave: Wave
-  phase: Phase
+  dayType: TrainingDayType
   week: number
-  sets: CompletedSet[]
+  block: Block
+  exercises: ExerciseLog[]
   startedAt: string
 }
 
@@ -18,7 +17,7 @@ interface WorkoutState {
   restTimerEnd: number | null
 
   startWorkout: (workout: Omit<ActiveWorkout, 'startedAt'>) => void
-  updateSet: (index: number, update: Partial<CompletedSet>) => void
+  updateExerciseSet: (exerciseIndex: number, setIndex: number, update: Partial<CompletedSet>) => void
   startRestTimer: (durationSeconds: number) => void
   clearRestTimer: () => void
   finishWorkout: (notes?: string) => Promise<string>
@@ -37,12 +36,16 @@ export const useWorkoutStore = create<WorkoutState>()((set, get) => ({
       },
     }),
 
-  updateSet: (index, update) =>
+  updateExerciseSet: (exerciseIndex, setIndex, update) =>
     set((state) => {
       if (!state.activeWorkout) return state
-      const sets = [...state.activeWorkout.sets]
-      sets[index] = { ...sets[index], ...update }
-      return { activeWorkout: { ...state.activeWorkout, sets } }
+      const exercises = [...state.activeWorkout.exercises]
+      const exercise = { ...exercises[exerciseIndex] }
+      const sets = [...exercise.sets]
+      sets[setIndex] = { ...sets[setIndex], ...update }
+      exercise.sets = sets
+      exercises[exerciseIndex] = exercise
+      return { activeWorkout: { ...state.activeWorkout, exercises } }
     }),
 
   startRestTimer: (durationSeconds) =>
@@ -58,11 +61,10 @@ export const useWorkoutStore = create<WorkoutState>()((set, get) => ({
     const log: WorkoutLog = {
       id: crypto.randomUUID(),
       cycleId: activeWorkout.cycleId,
-      lift: activeWorkout.lift,
-      wave: activeWorkout.wave,
-      phase: activeWorkout.phase,
+      dayType: activeWorkout.dayType,
       week: activeWorkout.week,
-      sets: activeWorkout.sets,
+      block: activeWorkout.block,
+      exercises: activeWorkout.exercises,
       date: now,
       notes,
       updatedAt: now,
@@ -71,7 +73,6 @@ export const useWorkoutStore = create<WorkoutState>()((set, get) => ({
 
     await db.workoutLogs.add(log)
     set({ activeWorkout: null, restTimerEnd: null })
-    // Trigger sync after saving workout
     setTimeout(() => useSyncStore.getState().triggerSync(), 2000)
     return log.id
   },

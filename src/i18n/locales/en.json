@@ -9,29 +9,79 @@
     "coach": "AI Coach",
     "settings": "Settings"
   },
-  "lifts": {
-    "squat": "Squat",
+  "exercises": {
+    "squat": "Barbell Squat",
     "bench": "Bench Press",
     "ohp": "Overhead Press",
-    "deadlift": "Deadlift"
+    "deadlift": "Deadlift",
+    "barbell_row": "Barbell Row",
+    "romanian_deadlift": "Romanian Deadlift",
+    "dumbbell_curl": "Dumbbell Curl",
+    "tricep_pushdown": "Tricep Pushdown",
+    "plank": "Plank",
+    "leg_press": "Leg Press",
+    "pullup": "Pull-ups",
+    "incline_db_press": "Incline DB Press",
+    "cable_row": "Cable Row",
+    "bulgarian_split_squat": "Bulgarian Split Squat",
+    "lateral_raise": "Lateral Raise",
+    "leg_curl": "Leg Curl",
+    "cable_crunch": "Cable Crunch",
+    "farmers_walk": "Farmer's Walk",
+    "perLeg": "per leg",
+    "short": {
+      "squat": "Squat",
+      "bench": "Bench",
+      "ohp": "OHP",
+      "deadlift": "Dead.",
+      "barbell_row": "Row",
+      "romanian_deadlift": "RDL",
+      "dumbbell_curl": "Curl",
+      "tricep_pushdown": "Tricep",
+      "plank": "Plank",
+      "leg_press": "Leg Pr.",
+      "pullup": "Pull-up",
+      "incline_db_press": "Inc.DB",
+      "cable_row": "Cable",
+      "bulgarian_split_squat": "BSS",
+      "lateral_raise": "Lat.R.",
+      "leg_curl": "Leg C.",
+      "cable_crunch": "Crunch",
+      "farmers_walk": "Farmer",
+      "deadlift": "DL"
+    }
   },
-  "waves": {
-    "10s": "10s Wave",
-    "8s": "8s Wave",
-    "5s": "5s Wave",
-    "3s": "3s Wave"
+  "dayTypes": {
+    "hypertrophy": "Hypertrophy",
+    "volume": "Volume",
+    "strength": "Strength",
+    "hypertrophyShort": "Mon — Hypertrophy",
+    "volumeShort": "Wed — Volume",
+    "strengthShort": "Fri — Strength"
   },
-  "phases": {
-    "accumulation": "Accumulation",
-    "intensification": "Intensification",
-    "realization": "Realization",
-    "deload": "Deload"
+  "blocks": {
+    "1": "Block 1: Adaptation",
+    "2": "Block 2: Hypertrophy",
+    "3": "Block 3: Strength & Peak",
+    "short1": "Adaptation",
+    "short2": "Hypertrophy",
+    "short3": "Strength",
+    "deload": "Deload",
+    "amrapTest": "AMRAP Test"
   },
   "effort": {
-    "accumulation": "Leave 2-3 reps in the tank",
-    "intensification": "End 1-2 reps shy of failure",
-    "realization": "No reps left in the tank — go all out!",
-    "deload": "Light and easy — recovery week"
+    "hypertrophy": "RPE 7-8 — leave 2-3 reps in reserve",
+    "volume": "RPE 7 — control the eccentric, 2-3 sec tempo down",
+    "strength": "RPE 8-9 — max intensity, long rest between sets",
+    "deload": "RPE 5-6 — light work, focus on technique and mobility",
+    "amrap": "RPE 10 — max test day, give it everything!"
+  },
+  "rpe": {
+    "6": "4+ reps in reserve (warmup)",
+    "7": "3 reps in reserve",
+    "8": "2 reps in reserve",
+    "9": "1 rep in reserve",
+    "10": "Absolute maximum"
   },
   "dashboard": {
     "weekProgress": "Week Progress",
@@ -58,34 +108,34 @@
       }
     },
     "tips": {
-      "accumulationTitle": "Tips: Accumulation Phase",
-      "accumulation": "Focus on volume and technique. Don't go to failure — keep 2-3 reps in reserve. Ensure adequate nutrition: enough calories and protein (1.6-2.2 g/kg) to recover from the high volume.",
-      "intensificationTitle": "Tips: Intensification Phase",
-      "intensification": "Weights are going up, fewer sets. Focus on the quality of each rep. Get at least 7-8 hours of sleep. Warm up thoroughly — joints and tendons must be ready for the increased load.",
-      "realizationTitle": "Tips: Realization Phase",
-      "realization": "AMRAP week — give it your all! Rest well 1-2 days before testing. Get mentally prepared. Every rep above the target increases your training max for the next cycle.",
-      "deloadTitle": "Tips: Deload Week",
-      "deload": "Don't skip the deload — it's critical for progress. Light weights, work on technique. Do stretching and mobility work. This is the time for full recovery before the next wave."
+      "block1Title": "Block 1: Adaptation & Base",
+      "block1": "Master technique, find your working weights. If all reps at upper range — add weight: +2.5 kg upper body, +5 kg lower body. Protein 1.6-2.2 g/kg, sleep 7-9 hours.",
+      "block2Title": "Block 2: Hypertrophy & Volume",
+      "block2": "Maximum volume for muscle growth. Control the eccentric phase (2-3 sec). You can swap 1-2 exercises on volume day for new stimulus. Eat at a 200-300 kcal surplus.",
+      "block3Title": "Block 3: Strength & Peak",
+      "block3": "Heavy weights, minimal volume. Rest 3-5 min between sets. Week 12 — max test (AMRAP @90%). Rest well before the test!",
+      "deloadTitle": "Deload Week",
+      "deload": "50-60% of working weights, same exercises. No work to failure. Focus on technique, mobility, stretching. After deload, start with previous block weights.",
+      "amrapTitle": "Test Week",
+      "amrap": "AMRAP @90% of estimated 1RM. Give it your all! Rest well 1-2 days before the test. Results will determine next cycle weights."
     }
   },
   "cycle": {
     "title": "New Cycle",
-    "enterOneRepMax": "Enter your 1RM",
-    "trainingMax": "Training Max (90%)",
-    "selectVariant": "Method Variant",
-    "classic": "Classic JM 2.0",
-    "inverted": "Inverted JM",
-    "startCycle": "Start Cycle",
+    "enterOneRepMax": "Enter your 1RM (kg)",
+    "oneRepMaxDesc": "Maximum weight for 1 rep on main lifts",
+    "workingWeightsPreview": "Calculated working weights",
+    "startCycle": "Start 12-Week Cycle",
     "week": "Week {{number}}",
     "noCycle": "No active cycle",
-    "createFirst": "Create your first training cycle",
+    "createFirst": "Create a 12-week training cycle",
     "overview": "Cycle Overview",
     "resetCycle": "Reset Cycle",
     "resetConfirm": "Delete the current cycle and all its data? This cannot be undone.",
     "startNextCycle": "Start Next Cycle",
-    "nextCycleDesc": "Start a new 16-week cycle using your current training maxes",
+    "nextCycleDesc": "Start a new cycle with increased working weights (+5-10%)",
     "cycleComplete": "Cycle Complete!",
-    "cycleCompleteDesc": "Great job finishing the cycle! Start a new one with updated training maxes or reset to enter new 1RMs."
+    "cycleCompleteDesc": "Great job! Start a new cycle with updated weights or reset to enter new 1RMs."
   },
   "workout": {
     "title": "Today's Workout",
@@ -94,8 +144,9 @@
     "workSet": "Work Set",
     "amrap": "AMRAP",
     "reps": "{{count}} reps",
+    "repsRange": "{{min}}-{{max}} reps",
     "weight": "{{weight}} kg",
-    "targetReps": "Target: {{count}}+",
+    "targetReps": "Target: {{min}}-{{max}}",
     "actualReps": "Reps done",
     "rest": "Rest",
     "restTimer": "Rest Timer",
@@ -103,14 +154,27 @@
     "finish": "Finish Workout",
     "cancel": "Cancel",
     "completed": "Workout Complete!",
-    "notes": "Notes (optional)"
+    "notes": "Notes (optional)",
+    "rpeLabel": "RPE",
+    "rpeSelect": "Rate RPE",
+    "exerciseDone": "Exercise done",
+    "setsCompleted": "{{done}}/{{total}} sets",
+    "progression": "Progression! +{{increment}} kg",
+    "noProgression": "Continue at current range",
+    "adjustWeight": "Adjust weight",
+    "dayComplete": "Day {{day}} complete",
+    "amrapResult": "AMRAP: {{reps}} reps @ {{weight}} kg",
+    "estimated1rm": "Estimated 1RM: {{value}} kg",
+    "seconds": "{{count}} sec",
+    "meters": "{{count}} m"
   },
   "analytics": {
     "title": "Analytics",
-    "tmProgress": "Training Max Progress",
-    "estimatedOneRM": "Estimated 1RM",
-    "volume": "Volume (Tonnage)",
-    "amrapResults": "AMRAP Results",
+    "weightProgress": "Working Weight Progress",
+    "volumeByWeek": "Volume by Week (Tonnage)",
+    "rpeHistory": "RPE History",
+    "amrapResults": "AMRAP Test Results",
+    "estimated1rm": "Estimated 1RM",
     "noData": "Complete some workouts to see analytics"
   },
   "coach": {
@@ -128,7 +192,8 @@
       "analyzeProgress": "Analyze my progress",
       "weakPoints": "What are my weak points?",
       "recovery": "Recovery tips",
-      "adjustTm": "Should I adjust my TM?"
+      "nutrition": "Nutrition advice",
+      "adjustWeights": "Should I adjust my weights?"
     },
     "clearHistory": "Clear",
     "insight": {
@@ -161,12 +226,9 @@
     "rounds": "{{count}} rounds",
     "timing": "{{work}}s / {{rest}}s rest",
     "totalTime": "~{{minutes}} min",
-    "frequency": "{{min}}-{{max}}x per week",
     "startTabata": "Start Tabata",
     "startBlock": "Start block",
     "finishTabata": "Finish Tabata",
-    "blockCompleted": "Block {{number}} done — {{exercise}}",
-    "blocksAvailable": "{{count}} blocks available",
     "min": "min",
     "rpe": "RPE (1-10)",
     "completed": "Tabata Complete!",
@@ -197,12 +259,6 @@
       "assault_bike": "Assault Bike",
       "rowing": "Rowing"
     },
-    "intensity": {
-      "accumulation": "Moderate intensity — maintain form through all blocks",
-      "intensification": "High intensity — push your pace, one block only",
-      "realization": "Moderate pace — save energy for AMRAP",
-      "deload": "Light effort — active recovery, stay moving"
-    },
     "equipment": {
       "title": "Equipment",
       "bodyweight": "Bodyweight",
@@ -210,9 +266,18 @@
       "cardio_machines": "Machines",
       "mixed": "Mixed"
     },
+    "intensity": {
+      "block1": "Moderate intensity — focus on adaptation and technique",
+      "block2": "Medium intensity — volume and endurance",
+      "block3": "Light intensity — recovery priority",
+      "deload": "Minimal load — light work for recovery"
+    },
+    "blocksAvailable": "{{count}} blocks",
+    "frequency": "{{min}}-{{max}} times/wk",
+    "blockCompleted": "Block {{number}} ({{exercise}}) complete!",
     "settings": {
       "enabled": "Tabata Conditioning",
-      "enabledDesc": "Add Tabata HIIT to your cycle for endurance"
+      "enabledDesc": "Add Tabata HIIT for endurance"
     }
   },
   "auth": {
@@ -238,6 +303,7 @@
     "delete": "Delete",
     "back": "Back",
     "loading": "Loading...",
-    "error": "Something went wrong"
+    "error": "Something went wrong",
+    "week": "Week"
   }
 }

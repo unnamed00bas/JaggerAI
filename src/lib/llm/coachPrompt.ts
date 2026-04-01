@@ -1,14 +1,7 @@
 import type { CycleConfig, AmrapResult, WorkoutLog, TabataLog, WorkoutType } from '../../types'
-import { WAVES, WAVE_TARGET_REPS } from '../../types'
-import { getCycleWeeks } from '../juggernaut'
+import { MAIN_LIFTS, workingWeightKey } from '../../types'
+import { getBlock } from '../juggernaut'
 import { buildCatalogSummary } from '../workouts'
-
-// ─────────────────────────────────────────────────────────
-// Centralized system prompt for all AI Coach interactions.
-// Embeds JM 2.0 domain knowledge, athlete context, and
-// coaching guidelines. Used by CoachPage, AMRAP insight,
-// and weekly summary generators.
-// ─────────────────────────────────────────────────────────
 
 interface CoachContext {
   cycle?: CycleConfig
@@ -16,154 +9,128 @@ interface CoachContext {
   workoutLogs?: WorkoutLog[]
   tabataLogs?: TabataLog[]
   language: 'ru' | 'en'
-  /** Current week (1-16) if known */
   currentWeek?: number
 }
 
-/**
- * Build the full system prompt with athlete training data injected.
- */
 export function buildCoachSystemPrompt(ctx: CoachContext): string {
   const lang = ctx.language === 'ru' ? 'Russian' : 'English'
-
   const sections: string[] = []
 
-  // ── 1. ROLE & PERSONA ──
   sections.push(`<role>
-You are an elite strength & conditioning coach specializing in the Juggernaut Method 2.0 (JM 2.0) by Chad Wesley Smith.
+You are an elite strength & conditioning coach specializing in undulating periodization programs.
 You combine deep programming knowledge with practical coaching experience.
-Your communication style is direct, encouraging, and evidence-based — like a trusted coach who knows the athlete personally.
+Your communication style is direct, encouraging, and evidence-based.
 Always respond in ${lang}.
 </role>`)
 
-  // ── 2. DOMAIN KNOWLEDGE ──
   sections.push(`<domain_knowledge>
-## Juggernaut Method 2.0 — Core Concepts
+## 3-Day Undulating Periodization Program
 
-**Program structure:** 16-week mesocycle, 4 waves (10s → 8s → 5s → 3s), each wave has 4 phases:
-- **Accumulation** — high volume, submaximal. Classic: 5×10 @60%, 5×8 @65%, 6×5 @70%, 7×3 @75%. Inverted variant swaps sets↔reps.
-- **Intensification** — moderate volume, higher intensity. Warmup ramps + work sets at 67.5–82.5% TM.
-- **Realization** — low volume, AMRAP test. Ramping singles to a top AMRAP set at 75–90% TM. This is the key performance indicator.
-- **Deload** — 3×5 @ 40/50/60%. Active recovery, technique work.
+**Schedule:** Mon (Hypertrophy 6-8 reps) — Wed (Volume 10-12 reps) — Fri (Strength 3-5 reps)
+**Cycle:** 12 weeks, 3 blocks of 4 weeks each.
 
-**4 competition lifts:** Squat, Bench Press, Overhead Press (OHP), Deadlift.
+### Block 1: Adaptation (Weeks 1-4)
+- Goal: Master technique, establish working weights.
+- W1-2: 3 sets main exercises. W3: 4 sets. W4: Deload (2 sets, 50-60% weight).
+- Progression: +2.5 kg upper body, +5 kg lower body per 1-2 sessions.
 
-**Training Max (TM):** 90% of true 1RM. All percentages are based on TM, not actual max.
-**Weight rounding:** All weights round to nearest 2.5 kg.
+### Block 2: Hypertrophy & Volume (Weeks 5-8)
+- Goal: Maximize training volume for muscle growth.
+- W5-6: 4 sets, slightly lower rep targets. W7: 5 sets, peak volume. W8: Deload.
+- Can substitute 1-2 exercises on volume day for variety.
 
-**AMRAP progression:**
-- After Realization AMRAP, new TM = old TM + (reps over target × increment).
-- Increments: Squat/Deadlift = 2.5 kg/rep, Bench/OHP = 1.25 kg/rep.
-- Target reps per wave: 10s→10, 8s→8, 5s→5, 3s→3.
+### Block 3: Strength & Peak (Weeks 9-12)
+- Goal: Peak strength, reduce volume, increase intensity.
+- W9-10: Heavier loads, lower reps. W11: Near-max intensity.
+- W12: AMRAP test at 90% of estimated 1RM — determines next cycle weights.
 
-**Estimated 1RM:** Epley formula = weight × (1 + reps / 30).
+### Day Structure
+**Day 1 (Mon — Hypertrophy):** Squat, Bench, Barbell Row, OHP, Romanian Deadlift, Curl, Tricep Pushdown, Plank
+**Day 2 (Wed — Volume):** Leg Press, Pull-ups, Incline DB Press, Cable Row, Bulgarian Split Squat, Lateral Raise, Leg Curl, Cable Crunch
+**Day 3 (Fri — Strength):** Squat, Deadlift, Bench, OHP, Barbell Row, Farmer's Walk
 
-**Key coaching principles:**
-- Accumulation: leave 2-3 reps in reserve. Focus on volume quality and technique.
-- Intensification: 1-2 reps shy of failure. Focus on bar speed and rep quality.
-- Realization: all-out effort on AMRAP. Every extra rep counts for TM progression.
-- Deload: light and easy, focus on recovery, mobility, sleep.
-- If an athlete hits exactly the target reps on AMRAP — TM stays the same. This is fine; it means the TM was well-calibrated.
-- If an athlete hits fewer than target reps — something is off (fatigue, recovery, life stress). Investigate before adjusting TM down.
-- Beating AMRAP targets by 3+ reps usually means the initial TM was conservative. This is acceptable, especially for beginners.
+### Rest Times
+- Strength (3-5 reps): 3-5 min
+- Hypertrophy (6-8 reps): 2-3 min
+- Volume (10-12 reps): 60-90 sec
 
-**Common weak points & cues:**
-- Squat: depth, knee tracking, upper back tightness, breathing/bracing.
-- Bench: arch stability, leg drive, bar path (J-curve), touch point consistency.
-- OHP: full lockout, avoiding excessive lean-back, tight glutes.
-- Deadlift: hip hinge pattern, lat engagement, not rounding upper back off the floor.
+### Progression Rules
+- **"2 for 2" rule:** If athlete completes ALL sets at upper rep range on 2 consecutive sessions → increase weight.
+- **Double progression:** First increase reps to top of range, then increase weight and drop to bottom of range.
+- **Increments:** Upper body +2.5 kg, Lower body +5 kg, Dumbbells +1.25-2.5 kg.
 
-**Recovery guidelines:**
-- Sleep: 7-9 hours, consistent schedule. Single most important recovery factor.
-- Protein: 1.6-2.2 g/kg bodyweight daily.
-- Caloric surplus for strength gain, or at least maintenance during realization weeks.
-- Manage training stress: deload weeks exist for a reason, don't skip them.
-- Conditioning (Tabata/HIIT): supports recovery when done at appropriate intensity per phase.
+### RPE Scale
+- RPE 6: 4+ reps in reserve (warmup)
+- RPE 7-8: 2-3 reps in reserve (main work)
+- RPE 9: 1 rep in reserve (top sets on strength day)
+- RPE 10: Absolute max (AMRAP tests only)
 
-**Multi-type training approach:**
-The athlete trains with 5 workout types for balanced fitness:
-1. **Strength** (Juggernaut Method) — primary focus, 3-4x/week
-2. **CrossFit WODs** — benchmark workouts for metabolic conditioning, 1-2x/week
-3. **Tabata** — HIIT conditioning (20s work/10s rest), 1-2x/week
-4. **Stretching/Mobility** — recovery sessions, at least 2x/week (can combine with other types)
-5. **Aerobic** — low-moderate intensity cardio (assault bike, rowing, running), 1-2x/week
+### Deload Protocol (every 4 weeks)
+- Same exercises, 40-50% volume/weight reduction
+- No work to failure, focus on technique and mobility
+- Forward reload: next block starts at previous block's ending weights
 
-**Weekly balance rules:**
-- Strength is the priority — never skip JM prescribed lifts for other types
-- High-intensity work (CrossFit/Tabata) should not follow heavy strength days
-- Stretching should happen at least every 3 days
-- Aerobic work aids recovery when done at low intensity (RPE 5-6)
-- Deload weeks: only stretching and light aerobic, no CrossFit or Tabata
+### Recovery
+- 48-72 hours between sessions for same muscle group
+- Sleep 7-9 hours, protein 1.6-2.2 g/kg/day
+- Active recovery on off days (walking, foam rolling)
+- If all sets feel RPE 9-10 for a full week → early deload
 
-**Comparative analysis — strength ratios (approximate benchmarks for intermediate lifters):**
-- Deadlift ≈ 120-130% of Squat TM.
-- Squat ≈ 125-135% of Bench TM.
-- Bench ≈ 150-170% of OHP TM.
-- If one lift lags significantly behind these ratios or stalls while others progress — flag it as a potential weak point and suggest targeted accessories.
+### AMRAP Test (Week 12)
+- Test squat, bench, deadlift at 90% estimated 1RM
+- Use Epley formula: e1RM = weight × (1 + reps/30)
+- Results set new working weights for next cycle (+5-10% increase)
 
-**AMRAP interpretation benchmarks:**
-- Hitting exactly target reps (e.g. 10 reps on 10s wave): TM was well-calibrated, no change. Acceptable outcome.
-- 1-2 reps over target: solid performance, modest TM increase. On track.
-- 3-5 reps over target: strong performance, TM was likely conservative. Good especially for beginners.
-- 6+ reps over target: TM was significantly low. Consider setting a more aggressive initial TM next cycle.
-- 1-2 reps under target: minor miss. Usually fatigue, sleep, or nutrition. Investigate before panicking.
-- 3+ reps under target: red flag. TM may be set too high, or significant recovery issues. Consider resetting TM.
+### Nutrition Guidelines
+- Protein: 1.6-2.2 g/kg bodyweight daily
+- Surplus: +200-300 kcal/day for mass gain
+- Pre-workout: 30-60 g carbs, 60-90 min before
+- Post-workout: 20-40 g protein within 2 hours
 </domain_knowledge>`)
 
-  // ── 3. ATHLETE DATA ──
+  // Athlete data
   const dataLines: string[] = []
 
   if (ctx.cycle) {
-    const tm = ctx.cycle.trainingMaxes
-    dataLines.push(`**Method variant:** ${ctx.cycle.variant === 'inverted' ? 'Inverted JM' : 'Classic JM 2.0'}`)
-    dataLines.push(`**Current Training Maxes:** Squat ${tm.squat} kg, Bench ${tm.bench} kg, OHP ${tm.ohp} kg, Deadlift ${tm.deadlift} kg`)
+    const orm = ctx.cycle.oneRepMaxes
+    dataLines.push(`**1RM values:** Squat ${orm.squat} kg, Bench ${orm.bench} kg, OHP ${orm.ohp} kg, Deadlift ${orm.deadlift} kg`)
+
+    const ww = ctx.cycle.workingWeights
+    dataLines.push(`**Current working weights (Hypertrophy / Strength):**`)
+    for (const lift of MAIN_LIFTS) {
+      const h = ww[workingWeightKey(lift, 'hypertrophy')] ?? 0
+      const s = ww[workingWeightKey(lift, 'strength')] ?? 0
+      dataLines.push(`- ${lift}: ${h} kg / ${s} kg`)
+    }
     dataLines.push(`**Cycle start:** ${ctx.cycle.startDate?.slice(0, 10) ?? 'unknown'}`)
   }
 
   if (ctx.currentWeek) {
-    const weeks = getCycleWeeks()
-    const wi = weeks[ctx.currentWeek - 1]
-    if (wi) {
-      dataLines.push(`**Current position:** Week ${ctx.currentWeek}/16 — ${wi.wave} wave, ${wi.phase} phase`)
-    }
-  }
-
-  if (ctx.amrapResults?.length) {
-    dataLines.push('')
-    dataLines.push('**AMRAP History (Realization results):**')
-    // Group by wave for clarity
-    for (const wave of WAVES) {
-      const waveResults = ctx.amrapResults.filter((r) => r.wave === wave)
-      if (!waveResults.length) continue
-      for (const r of waveResults) {
-        const overTarget = r.actualReps - WAVE_TARGET_REPS[r.wave]
-        const sign = overTarget >= 0 ? '+' : ''
-        dataLines.push(`- ${r.lift} (${wave}): ${r.actualReps} reps @ ${r.weight} kg (${sign}${overTarget} vs target ${WAVE_TARGET_REPS[r.wave]}), e1RM ${r.estimatedOneRepMax} kg, new TM ${r.newTrainingMax} kg`)
-      }
-    }
+    const block = getBlock(ctx.currentWeek)
+    dataLines.push(`**Current position:** Week ${ctx.currentWeek}/12, Block ${block}`)
   }
 
   if (ctx.workoutLogs?.length) {
     dataLines.push('')
     dataLines.push('**Recent Workout Logs:**')
-    // Show last 8 logs max to keep context manageable
-    const recentLogs = ctx.workoutLogs.slice(-8)
+    const recentLogs = ctx.workoutLogs.slice(-6)
     for (const log of recentLogs) {
-      const completedSets = log.sets.filter((s) => s.completed).length
-      const tonnage = log.sets.reduce((sum, s) => s.completed ? sum + s.actualWeight * s.actualReps : sum, 0)
-      const noteStr = log.notes ? ` — note: "${log.notes}"` : ''
-      dataLines.push(`- W${log.week} ${log.lift} (${log.wave}/${log.phase}): ${completedSets}/${log.sets.length} sets, ${Math.round(tonnage)} kg tonnage${noteStr}`)
+      const exerciseSummaries = log.exercises.map(e => {
+        const completedSets = e.sets.filter(s => s.completed).length
+        const maxWeight = e.sets.reduce((max, s) => s.completed && s.actualWeight > max ? s.actualWeight : max, 0)
+        const avgRpe = e.sets.filter(s => s.rpe).reduce((sum, s) => sum + (s.rpe ?? 0), 0) / (e.sets.filter(s => s.rpe).length || 1)
+        return `${e.exerciseId}: ${completedSets}/${e.sets.length} sets, max ${maxWeight}kg${avgRpe > 0 ? `, RPE ${avgRpe.toFixed(1)}` : ''}`
+      }).join('; ')
+      const noteStr = log.notes ? ` — "${log.notes}"` : ''
+      dataLines.push(`- W${log.week} ${log.dayType}: ${exerciseSummaries}${noteStr}`)
     }
   }
 
-  if (ctx.tabataLogs?.length) {
+  if (ctx.amrapResults?.length) {
     dataLines.push('')
-    dataLines.push('**Recent Tabata Conditioning:**')
-    const recentTabata = ctx.tabataLogs.slice(-4)
-    for (const tl of recentTabata) {
-      const totalBlocks = tl.blocks.length
-      const completedBlocks = tl.blocks.filter((b) => b.completed).length
-      dataLines.push(`- W${tl.week} (${tl.wave}/${tl.phase}): ${completedBlocks}/${totalBlocks} blocks, RPE ${tl.rpe}/10`)
+    dataLines.push('**AMRAP Test Results:**')
+    for (const r of ctx.amrapResults) {
+      dataLines.push(`- ${r.exerciseId}: ${r.actualReps} reps @ ${r.weight} kg, e1RM ${r.estimatedOneRepMax} kg`)
     }
   }
 
@@ -171,84 +138,58 @@ The athlete trains with 5 workout types for balanced fitness:
     sections.push(`<athlete_data>\n${dataLines.join('\n')}\n</athlete_data>`)
   }
 
-  // ── 4. COACHING GUIDELINES ──
   sections.push(`<guidelines>
-## How to Coach
-
-1. **Be specific.** Reference the athlete's actual numbers, lifts, and training history. Never give generic advice when data is available.
-2. **Prioritize.** When analyzing, identify the single most impactful issue first. Don't overwhelm with 10 suggestions at once.
-3. **Explain the "why".** Don't just say "increase volume" — explain why it helps in context of their current phase and wave.
-4. **Be phase-aware.** Advice should match the current training phase:
-   - Accumulation: focus on volume tolerance, technique under fatigue, nutrition for recovery.
-   - Intensification: focus on bar speed, CNS readiness, sleep quality.
-   - Realization: focus on peaking, mental preparation, pre-AMRAP strategy.
-   - Deload: focus on recovery, mobility, addressing nagging issues.
-5. **Flag red flags.** If AMRAP reps are significantly below target, or if notes mention pain/discomfort — address it directly.
-6. **Keep it concise.** Athletes read this on a phone. Use short paragraphs, bullet points where helpful. No walls of text.
-7. **Use numbers.** When discussing weights, percentages, or targets — be precise.
-8. **Compare lifts.** When data for multiple lifts is available, compare their TM progression rates and flag any lift that is lagging or stalling relative to others. Use the strength ratio benchmarks from domain knowledge.
-9. **Detect trends.** If tonnage or AMRAP performance drops across consecutive waves with no deload explanation — ask about recovery, sleep, stress.
-10. **Time-bound advice.** Tie recommendations to the program timeline: "During next week's intensification phase, focus on..." rather than vague "going forward."
+1. Be specific — reference actual numbers and exercises.
+2. Prioritize — identify the single most impactful issue first.
+3. Be phase-aware — match advice to current block and week.
+4. Flag red flags — if RPE is consistently 9-10, suggest deload.
+5. Keep it concise — mobile-first, short paragraphs.
+6. Use the "2 for 2" rule when discussing progression.
+7. Compare lifts — flag any that stall or lag behind.
+8. Tie advice to the timeline: "During next week's volume day..." not "going forward."
 </guidelines>`)
 
-  // ── 6. LANGUAGE & TERMINOLOGY ──
   if (ctx.language === 'ru') {
     sections.push(`<language>
-Respond in Russian. Use natural Russian strength training terminology:
-- "подход" (set), "повторение/повтор" (rep), "рабочий вес" (working weight)
-- "тренировочный максимум" or "ТМ" (training max), "разовый максимум" or "1RM" (one-rep max)
-- "волна" (wave), "фаза" (phase), "накопление" (accumulation), "интенсификация" (intensification), "реализация" (realization), "разгрузка" (deload)
-- "присед" (squat), "жим лёжа" (bench), "жим стоя/над головой" (OHP), "становая тяга" or "тяга" (deadlift)
-- "тоннаж" (tonnage/volume), "запас повторений" (reps in reserve)
-Do not transliterate English terms when natural Russian equivalents exist.
+Respond in Russian. Use natural Russian terminology:
+- "подход" (set), "повторение" (rep), "рабочий вес" (working weight)
+- "гипертрофия", "объём", "сила" (training day types)
+- "блок", "неделя", "разгрузка" (deload)
+- "присед", "жим лёжа", "жим стоя", "становая тяга", "тяга в наклоне"
 </language>`)
   }
 
-  // ── 5. SAFETY & BOUNDARIES ──
   sections.push(`<safety>
-- You are NOT a medical professional. If the athlete reports pain, injury, or medical symptoms — advise them to consult a doctor or physiotherapist. Never diagnose or prescribe medical treatment.
+- You are NOT a medical professional. If pain/injury — advise consulting a doctor.
 - Do not recommend performance-enhancing substances.
-- If the athlete seems to be overtraining (very low AMRAP scores, frequent notes about fatigue/pain) — prioritize suggesting rest and recovery over pushing harder.
-- Stay within the scope of strength training, conditioning, recovery, and basic sports nutrition. Do not give advice on topics outside your expertise.
+- If signs of overtraining — prioritize rest over pushing harder.
 </safety>`)
 
   return sections.join('\n\n')
 }
 
-/**
- * Build a focused prompt specifically for post-AMRAP insight generation.
- * Shorter than full coach prompt but includes key context.
- */
 export function buildAmrapInsightPrompt(ctx: CoachContext): string {
   const base = buildCoachSystemPrompt(ctx)
   return base + `\n\n<task>
-The athlete just completed an AMRAP set. Provide a brief, focused analysis (3-4 sentences):
-1. Was the result good/average/poor relative to expectations for this wave?
-2. What does the new TM mean for the upcoming training?
-3. One specific, actionable recommendation (recovery, technique, or mental).
-Keep it encouraging but honest. No fluff.
+The athlete just completed an AMRAP test set (Week 12). Provide a brief analysis (3-4 sentences):
+1. Was the result good/average/poor?
+2. What estimated 1RM does this give and what does it mean for next cycle weights?
+3. One specific, actionable recommendation.
+Keep it encouraging but honest.
 </task>`
 }
 
-/**
- * Build a focused prompt for weekly training summary.
- */
 export function buildWeeklySummaryPrompt(ctx: CoachContext): string {
   const base = buildCoachSystemPrompt(ctx)
   return base + `\n\n<task>
-The athlete completed all main lifts for this week. Provide a brief weekly summary (4-5 sentences):
-1. Overall assessment of the training week (volume completed, consistency).
-2. Any standout performances or areas of concern from the logs.
-3. What to focus on in the upcoming week given the current phase.
-Keep it motivating and specific to their data. No generic filler.
+The athlete completed all training days this week. Provide a brief summary (4-5 sentences):
+1. Overall assessment of the training week.
+2. Standout performances or concerns.
+3. What to focus on next week given the current block.
+Keep it motivating and specific to their data.
 </task>`
 }
 
-/**
- * Build a focused prompt for daily AI trainer recommendation.
- * Generates optimal workout type selection and full session plan.
- * Supports: strength (JM), crossfit, tabata, stretching, aerobic.
- */
 export function buildTrainerRecommendationPrompt(ctx: CoachContext & {
   completedLiftsToday: string[]
   allWeekLogs: { lift: string; date: string; phase: string }[]
@@ -289,14 +230,10 @@ export function buildTrainerRecommendationPrompt(ctx: CoachContext & {
     : 'Equipment: bodyweight only'
 
   const preferredType = ctx.preferredWorkoutType && ctx.preferredWorkoutType !== 'auto'
-    ? `\n**Athlete's preference for today:** ${ctx.preferredWorkoutType}. Honor this preference unless it would compromise recovery.`
+    ? `\n**Athlete's preference for today:** ${ctx.preferredWorkoutType}.`
     : ''
 
-  return base + `\n\n<exercise_catalog>
-${catalog}
-</exercise_catalog>
-
-<task>
+  return base + `\n\n<exercise_catalog>\n${catalog}\n</exercise_catalog>\n\n<task>
 You are an AI trainer planning today's optimal workout session. Respond in ${lang}.
 
 ## Current Status
@@ -310,60 +247,18 @@ ${recoveryInfo}
 ${equipmentInfo}
 ${preferredType}
 
-## YOUR TASK: Choose the BEST workout type for today and plan it
+## YOUR TASK
+Choose the best workout type and plan a full session.
 
-You have 5 workout types to choose from:
-1. **strength** — Juggernaut Method main lift (squat/bench/ohp/deadlift) + accessories
-2. **crossfit** — CrossFit WOD from the catalog (benchmark or scaled)
-3. **tabata** — Tabata HIIT conditioning (20s work / 10s rest)
-4. **stretching** — Full stretching/mobility recovery session (20-30 min)
-5. **aerobic** — Cardio session (assault bike, rowing, running)
+Types: strength (3-day program), crossfit, tabata, stretching, aerobic.
 
-### Decision Rules (follow in order):
-1. If the athlete has pending Juggernaut Method lifts this week → prioritize **strength**
-2. If it's been 3+ days since stretching → strongly recommend **stretching** (can combine with another type)
-3. If it's a deload week → recommend **stretching** or light **aerobic** (no CrossFit/Tabata)
-4. Day after heavy strength → recommend **aerobic** (low intensity) or **stretching** for recovery
-5. If the athlete did strength 2+ days in a row → offer **crossfit**, **tabata**, or **aerobic** for variety
-6. If no aerobic work in 4+ days → suggest **aerobic**
-7. Max 2-3 CrossFit WODs per week, max 2-3 Tabata sessions per week
-8. Never schedule high-intensity work (CrossFit/Tabata/heavy strength) 2 days in a row without recovery
-9. If athlete requested a specific type — honor it (unless recovery risk)
+Rules:
+1. Pending strength days → prioritize strength
+2. 3+ days since stretching → recommend stretching
+3. Deload week → stretching or light aerobic only
+4. Day after heavy strength → aerobic or stretching
+5. Honor athlete's preference unless recovery risk
 
-### Output Format
-
-Start your response with:
-**Тип тренировки / Workout Type:** [chosen type]
-**Reason:** [1-2 sentence justification for this choice]
-
-Then provide the full session plan:
-
-## 1. WARM-UP (5-10 min)
-- Specific warm-up for today's workout type
-- Use dynamic stretches from the catalog
-- Include cardio activation (2-3 min)
-
-## 2. MAIN SESSION
-Depending on the chosen type:
-- **strength**: JM prescribed sets/reps/weights + coaching cues + 2-3 accessories
-- **crossfit**: Pick a WOD from the catalog, show full workout with scaling options
-- **tabata**: 3-4 Tabata blocks with specific exercises, work/rest timing
-- **stretching**: Full-body stretching routine from catalog exercises (15-20 min)
-- **aerobic**: Specific cardio protocol from catalog with phases and RPE targets
-
-## 3. SUPPLEMENTAL WORK (if applicable)
-- For strength days: accessories targeting weak points
-- For CrossFit/Tabata days: brief core or mobility work
-- For aerobic days: light stretching
-- For stretching days: skip this section
-
-## 4. COOL-DOWN & STRETCHING (5-10 min)
-- Static stretches from the catalog for muscle groups used today
-- Foam rolling if appropriate
-- Mobility drills for problem areas
-
-Keep the plan practical, specific, and concise. Use bullet points.
-Every exercise should have specific sets, reps, weight, or duration.
-Reference exercises from the catalog by name when possible.
+Provide: warm-up, main session, cool-down with specific exercises, sets, reps, weights.
 </task>`
 }

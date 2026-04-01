@@ -19,8 +19,7 @@ export function SettingsPage() {
     return JSON.stringify({
       theme: s.theme,
       language: s.language,
-      restTimerSeconds: s.restTimerSeconds,
-      variant: s.variant,
+      defaultRestTimerSeconds: s.defaultRestTimerSeconds,
       tabataEnabled: s.tabataEnabled,
       tabataEquipment: s.tabataEquipment,
       llmProvider: s.llmProvider,
@@ -114,33 +113,14 @@ export function SettingsPage() {
           {[60, 90, 120, 180, 300].map((seconds) => (
             <button
               key={seconds}
-              onClick={() => { settings.setRestTimerSeconds(seconds); markChanged() }}
+              onClick={() => { settings.setDefaultRestTimerSeconds(seconds); markChanged() }}
               className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
-                settings.restTimerSeconds === seconds
+                settings.defaultRestTimerSeconds === seconds
                   ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
                   : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400'
               }`}
             >
               {seconds >= 60 ? `${seconds / 60}m` : `${seconds}s`}
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="text-sm font-semibold mb-3">{t('cycle.selectVariant')}</h2>
-        <div className="flex gap-2">
-          {(['classic', 'inverted'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => { settings.setVariant(v); markChanged() }}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
-                settings.variant === v
-                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400'
-              }`}
-            >
-              {t(`cycle.${v}`)}
             </button>
           ))}
         </div>

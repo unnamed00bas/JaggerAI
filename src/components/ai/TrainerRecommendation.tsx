@@ -6,7 +6,7 @@ import { Button } from '../ui/Button'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useCycleStore } from '../../stores/cycleStore'
 import { useCoachChatStore } from '../../stores/coachChatStore'
-import { getCycleWeeks } from '../../lib/juggernaut'
+import { getBlock } from '../../lib/juggernaut'
 import type { WorkoutType } from '../../types'
 
 const WORKOUT_TYPE_OPTIONS: { type: WorkoutType | 'auto'; icon: string; labelKey: string }[] = [
@@ -48,8 +48,8 @@ export function TrainerRecommendation() {
     )
   }
 
-  const weeks = getCycleWeeks()
-  const weekInfo = weeks[currentWeek - 1]
+  const block = getBlock(currentWeek)
+  const blockLabel = t(`blocks.short${block}`)
 
   function handleSelectType(selectedType: WorkoutType | 'auto') {
     const today = new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', {
@@ -57,12 +57,6 @@ export function TrainerRecommendation() {
       day: 'numeric',
       month: 'long',
     })
-
-    const phaseLabel = weekInfo
-      ? language === 'ru'
-        ? t(`phases.${weekInfo.phase}`)
-        : weekInfo.phase
-      : ''
 
     const typeInstruction = selectedType === 'auto'
       ? language === 'ru'
@@ -73,8 +67,8 @@ export function TrainerRecommendation() {
         : `I want a ${selectedType} workout. Plan a full session of this type.`
 
     const prompt = language === 'ru'
-      ? `Спланируй мне тренировку на сегодня (${today}). Сейчас ${phaseLabel}, неделя ${currentWeek}/16. ${typeInstruction} Включи разминку, основную часть, заминку и растяжку. Для каждого упражнения укажи подходы, повторения, вес или время.`
-      : `Plan my workout for today (${today}). Currently in ${phaseLabel}, week ${currentWeek}/16. ${typeInstruction} Include warm-up, main session, cool-down and stretching. Specify sets, reps, weight or duration for each exercise.`
+      ? `Спланируй мне тренировку на сегодня (${today}). Сейчас ${blockLabel}, неделя ${currentWeek}/12. ${typeInstruction} Включи разминку, основную часть, заминку и растяжку. Для каждого упражнения укажи подходы, повторения, вес или время.`
+      : `Plan my workout for today (${today}). Currently in ${blockLabel}, week ${currentWeek}/12. ${typeInstruction} Include warm-up, main session, cool-down and stretching. Specify sets, reps, weight or duration for each exercise.`
 
     setPendingPrompt(prompt)
     navigate('/coach')
