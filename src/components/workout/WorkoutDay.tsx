@@ -70,7 +70,7 @@ export function WorkoutDay() {
 
   if (!cycle || !activeWorkout) return null
 
-  const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights)
+  const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights, exerciseSelections)
 
   function handleSetComplete(exerciseIdx: number, setIdx: number) {
     const set = activeWorkout!.exercises[exerciseIdx].sets[setIdx]

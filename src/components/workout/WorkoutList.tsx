@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCycleStore } from '../../stores/cycleStore'
+import { useExerciseSelectionStore } from '../../stores/exerciseSelectionStore'
 import { db } from '../../lib/db'
 import { getDayPrescription, getBlock } from '../../lib/juggernaut'
 import { Card } from '../ui/Card'
@@ -14,6 +15,7 @@ export function WorkoutList() {
   const navigate = useNavigate()
   const activeCycleId = useCycleStore((s) => s.activeCycleId)
   const currentWeek = useCycleStore((s) => s.currentWeek)
+  const exerciseSelections = useExerciseSelectionStore((s) => s.selections)
 
   const cycle = useLiveQuery(
     () => (activeCycleId ? db.cycles.get(activeCycleId) : undefined),
@@ -59,7 +61,7 @@ export function WorkoutList() {
       </div>
 
       {TRAINING_DAYS.map((dayType) => {
-        const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights)
+        const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights, exerciseSelections)
         const isDone = completedDays.has(dayType)
         const exerciseCount = prescription.exercises.length
 
