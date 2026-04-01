@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCycleStore } from '../stores/cycleStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useExerciseSelectionStore } from '../stores/exerciseSelectionStore'
 import { db } from '../lib/db'
 import { getCycleWeeks, getDayPrescription, getExerciseWeight, getBlock } from '../lib/juggernaut'
 import { generateWeeklySummary } from '../lib/llm'
@@ -23,6 +24,7 @@ export function Dashboard() {
   const llmModel = useSettingsStore((s) => s.llmModel)
   const llmBaseUrl = useSettingsStore((s) => s.llmBaseUrl)
   const language = useSettingsStore((s) => s.language)
+  const exerciseSelections = useExerciseSelectionStore((s) => s.selections)
 
   const [weekSummary, setWeekSummary] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
@@ -147,7 +149,7 @@ export function Dashboard() {
 
       {/* Training day cards */}
       {TRAINING_DAYS.map((dayType) => {
-        const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights)
+        const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights, exerciseSelections)
         const isDone = completedDays.has(dayType)
         const firstExercise = prescription.exercises[0]
         const weight = firstExercise
