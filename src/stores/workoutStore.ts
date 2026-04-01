@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import type { CompletedSet, ExerciseLog, WorkoutLog, TrainingDayType, Block } from '../types'
 import { db } from '../lib/db'
-import { useSyncStore } from './syncStore'
 
 interface ActiveWorkout {
   cycleId: string
@@ -68,12 +67,10 @@ export const useWorkoutStore = create<WorkoutState>()((set, get) => ({
       date: now,
       notes,
       updatedAt: now,
-      _dirty: 1,
     }
 
     await db.workoutLogs.add(log)
     set({ activeWorkout: null, restTimerEnd: null })
-    setTimeout(() => useSyncStore.getState().triggerSync(), 2000)
     return log.id
   },
 

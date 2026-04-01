@@ -28,6 +28,29 @@
     "leg_curl": "Leg Curl",
     "cable_crunch": "Cable Crunch",
     "farmers_walk": "Farmer's Walk",
+    "front_squat": "Front Squat",
+    "hack_squat": "Hack Squat",
+    "dumbbell_bench": "Dumbbell Bench Press",
+    "machine_chest_press": "Machine Chest Press",
+    "dumbbell_row": "Dumbbell Row",
+    "t_bar_row": "T-Bar Row",
+    "dumbbell_ohp": "Dumbbell Overhead Press",
+    "stiff_leg_deadlift": "Stiff Leg Deadlift",
+    "barbell_curl": "Barbell Curl",
+    "hammer_curl": "Hammer Curl",
+    "overhead_tricep_ext": "Overhead Tricep Extension",
+    "dips": "Dips",
+    "ab_wheel": "Ab Wheel",
+    "hanging_leg_raise": "Hanging Leg Raise",
+    "lat_pulldown": "Lat Pulldown",
+    "incline_barbell_press": "Incline Barbell Press",
+    "lunges": "Lunges",
+    "step_ups": "Step-Ups",
+    "cable_lateral_raise": "Cable Lateral Raise",
+    "nordic_curl": "Nordic Curl",
+    "sumo_deadlift": "Sumo Deadlift",
+    "trap_bar_deadlift": "Trap Bar Deadlift",
+    "kettlebell_swing": "Kettlebell Swing",
     "perLeg": "per leg",
     "short": {
       "squat": "Squat",
@@ -48,7 +71,30 @@
       "leg_curl": "Leg C.",
       "cable_crunch": "Crunch",
       "farmers_walk": "Farmer",
-      "deadlift": "DL"
+      "deadlift": "DL",
+      "front_squat": "Fr.Sq.",
+      "hack_squat": "Hack",
+      "dumbbell_bench": "DB Ben.",
+      "machine_chest_press": "Mach.",
+      "dumbbell_row": "DB Row",
+      "t_bar_row": "T-Bar",
+      "dumbbell_ohp": "DB OHP",
+      "stiff_leg_deadlift": "SLDL",
+      "barbell_curl": "BB Curl",
+      "hammer_curl": "Hammer",
+      "overhead_tricep_ext": "OH Tri.",
+      "dips": "Dips",
+      "ab_wheel": "Ab Whl.",
+      "hanging_leg_raise": "HLR",
+      "lat_pulldown": "Lat PD",
+      "incline_barbell_press": "Inc.BB",
+      "lunges": "Lunges",
+      "step_ups": "Step-Up",
+      "cable_lateral_raise": "Cab.LR",
+      "nordic_curl": "Nordic",
+      "sumo_deadlift": "Sumo",
+      "trap_bar_deadlift": "Trap",
+      "kettlebell_swing": "KB Sw."
     }
   },
   "dayTypes": {
@@ -216,9 +262,9 @@
     "llmModel": "Model",
     "llmBaseUrl": "API Address (Base URL)",
     "saved": "Saved!",
-    "sync": "Cloud Sync",
-    "syncEnabled": "Sync Enabled",
-    "syncStatus": "Status"
+    "exercises": "Exercise Selection",
+    "exercisesDesc": "Choose exercises for each training day",
+    "customized": "customized"
   },
   "tabata": {
     "title": "Tabata Conditioning",
@@ -279,22 +325,6 @@
       "enabled": "Tabata Conditioning",
       "enabledDesc": "Add Tabata HIIT for endurance"
     }
-  },
-  "auth": {
-    "title": "Account",
-    "signin": "Sign In",
-    "signup": "Sign Up",
-    "signOut": "Sign Out",
-    "password": "Password",
-    "notConfigured": "Cloud sync is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in environment."
-  },
-  "sync": {
-    "never": "Never synced",
-    "justNow": "Synced just now",
-    "minutesAgo": "Synced {{count}} min ago",
-    "hoursAgo": "Synced {{count}}h ago",
-    "syncing": "Syncing...",
-    "syncNow": "Sync Now"
   },
   "common": {
     "kg": "kg",

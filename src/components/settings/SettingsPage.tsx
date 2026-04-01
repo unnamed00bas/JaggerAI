@@ -4,8 +4,7 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
-import { AuthSection } from './AuthSection'
-import { SyncSection } from './SyncSection'
+import { ExerciseSelectionSection } from './ExerciseSelectionSection'
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation()
@@ -66,9 +65,6 @@ export function SettingsPage() {
         )}
       </div>
 
-      <AuthSection />
-      <SyncSection />
-
       <Card>
         <h2 className="text-sm font-semibold mb-3">{t('settings.theme')}</h2>
         <div className="flex gap-2">
@@ -125,6 +121,8 @@ export function SettingsPage() {
           ))}
         </div>
       </Card>
+
+      <ExerciseSelectionSection />
 
       <Card>
         <div className="flex items-center justify-between mb-1">

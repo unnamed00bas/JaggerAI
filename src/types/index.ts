@@ -42,6 +42,30 @@ export type ExerciseId =
   // Day 3 only
   | 'deadlift'
   | 'farmers_walk'
+  // --- Alternatives ---
+  | 'front_squat'
+  | 'hack_squat'
+  | 'dumbbell_bench'
+  | 'machine_chest_press'
+  | 'dumbbell_row'
+  | 't_bar_row'
+  | 'dumbbell_ohp'
+  | 'stiff_leg_deadlift'
+  | 'barbell_curl'
+  | 'hammer_curl'
+  | 'overhead_tricep_ext'
+  | 'dips'
+  | 'ab_wheel'
+  | 'hanging_leg_raise'
+  | 'lat_pulldown'
+  | 'incline_barbell_press'
+  | 'lunges'
+  | 'step_ups'
+  | 'cable_lateral_raise'
+  | 'nordic_curl'
+  | 'sumo_deadlift'
+  | 'trap_bar_deadlift'
+  | 'kettlebell_swing'
 
 /** Category determines how sets/reps change with periodization */
 export type ExerciseCategory = 'primary' | 'secondary' | 'accessory'
@@ -78,17 +102,95 @@ export const EXERCISES: Record<ExerciseId, ExerciseDefinition> = {
   cable_crunch:         { id: 'cable_crunch',         category: 'accessory', bodyPart: 'core',  isCompound: false, increment: 2.5 },
   deadlift:             { id: 'deadlift',             category: 'primary',   bodyPart: 'lower', isCompound: true,  increment: 5 },
   farmers_walk:         { id: 'farmers_walk',         category: 'accessory', bodyPart: 'core',  isCompound: false, increment: 5, isDistanceBased: true },
+  // --- Alternatives ---
+  front_squat:          { id: 'front_squat',          category: 'primary',   bodyPart: 'lower', isCompound: true,  increment: 5 },
+  hack_squat:           { id: 'hack_squat',           category: 'primary',   bodyPart: 'lower', isCompound: true,  increment: 5 },
+  dumbbell_bench:       { id: 'dumbbell_bench',       category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  machine_chest_press:  { id: 'machine_chest_press',  category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  dumbbell_row:         { id: 'dumbbell_row',         category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  t_bar_row:            { id: 't_bar_row',            category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  dumbbell_ohp:         { id: 'dumbbell_ohp',         category: 'secondary', bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  stiff_leg_deadlift:   { id: 'stiff_leg_deadlift',   category: 'secondary', bodyPart: 'lower', isCompound: true,  increment: 5 },
+  barbell_curl:         { id: 'barbell_curl',         category: 'accessory', bodyPart: 'upper', isCompound: false, increment: 1.25 },
+  hammer_curl:          { id: 'hammer_curl',          category: 'accessory', bodyPart: 'upper', isCompound: false, increment: 1.25 },
+  overhead_tricep_ext:  { id: 'overhead_tricep_ext',  category: 'accessory', bodyPart: 'upper', isCompound: false, increment: 2.5 },
+  dips:                 { id: 'dips',                 category: 'accessory', bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  ab_wheel:             { id: 'ab_wheel',             category: 'accessory', bodyPart: 'core',  isCompound: false, increment: 0 },
+  hanging_leg_raise:    { id: 'hanging_leg_raise',    category: 'accessory', bodyPart: 'core',  isCompound: false, increment: 0 },
+  lat_pulldown:         { id: 'lat_pulldown',         category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  incline_barbell_press:{ id: 'incline_barbell_press',category: 'primary',   bodyPart: 'upper', isCompound: true,  increment: 2.5 },
+  lunges:               { id: 'lunges',               category: 'secondary', bodyPart: 'lower', isCompound: true,  increment: 2.5 },
+  step_ups:             { id: 'step_ups',             category: 'secondary', bodyPart: 'lower', isCompound: true,  increment: 2.5 },
+  cable_lateral_raise:  { id: 'cable_lateral_raise',  category: 'accessory', bodyPart: 'upper', isCompound: false, increment: 1.25 },
+  nordic_curl:          { id: 'nordic_curl',          category: 'accessory', bodyPart: 'lower', isCompound: false, increment: 0 },
+  sumo_deadlift:        { id: 'sumo_deadlift',        category: 'primary',   bodyPart: 'lower', isCompound: true,  increment: 5 },
+  trap_bar_deadlift:    { id: 'trap_bar_deadlift',    category: 'primary',   bodyPart: 'lower', isCompound: true,  increment: 5 },
+  kettlebell_swing:     { id: 'kettlebell_swing',     category: 'accessory', bodyPart: 'core',  isCompound: true,  increment: 5 },
 }
 
 /** Main compound lifts for which user enters 1RM at setup */
 export const MAIN_LIFTS = ['squat', 'bench', 'ohp', 'deadlift'] as const
 export type MainLift = typeof MAIN_LIFTS[number]
 
-/** Exercises for each training day (ordered) */
+/** Default exercises for each training day (ordered) */
 export const DAY_EXERCISES: Record<TrainingDayType, ExerciseId[]> = {
   hypertrophy: ['squat', 'bench', 'barbell_row', 'ohp', 'romanian_deadlift', 'dumbbell_curl', 'tricep_pushdown', 'plank'],
   volume:      ['leg_press', 'pullup', 'incline_db_press', 'cable_row', 'bulgarian_split_squat', 'lateral_raise', 'leg_curl', 'cable_crunch'],
   strength:    ['squat', 'deadlift', 'bench', 'ohp', 'barbell_row', 'farmers_walk'],
+}
+
+/**
+ * Exercise alternatives per slot.
+ * Key = "dayType_slotIndex" (e.g. "hypertrophy_0" = first exercise in hypertrophy day).
+ * Each array starts with the default exercise.
+ */
+export const EXERCISE_SLOT_ALTERNATIVES: Record<string, ExerciseId[]> = {
+  // --- Hypertrophy day ---
+  hypertrophy_0: ['squat', 'front_squat', 'hack_squat'],
+  hypertrophy_1: ['bench', 'dumbbell_bench', 'machine_chest_press'],
+  hypertrophy_2: ['barbell_row', 'dumbbell_row', 't_bar_row'],
+  hypertrophy_3: ['ohp', 'dumbbell_ohp'],
+  hypertrophy_4: ['romanian_deadlift', 'stiff_leg_deadlift'],
+  hypertrophy_5: ['dumbbell_curl', 'barbell_curl', 'hammer_curl'],
+  hypertrophy_6: ['tricep_pushdown', 'overhead_tricep_ext', 'dips'],
+  hypertrophy_7: ['plank', 'ab_wheel', 'hanging_leg_raise'],
+  // --- Volume day ---
+  volume_0: ['leg_press', 'hack_squat'],
+  volume_1: ['pullup', 'lat_pulldown'],
+  volume_2: ['incline_db_press', 'incline_barbell_press'],
+  volume_3: ['cable_row', 'dumbbell_row', 't_bar_row'],
+  volume_4: ['bulgarian_split_squat', 'lunges', 'step_ups'],
+  volume_5: ['lateral_raise', 'cable_lateral_raise'],
+  volume_6: ['leg_curl', 'nordic_curl'],
+  volume_7: ['cable_crunch', 'ab_wheel', 'hanging_leg_raise'],
+  // --- Strength day ---
+  strength_0: ['squat', 'front_squat', 'hack_squat'],
+  strength_1: ['deadlift', 'sumo_deadlift', 'trap_bar_deadlift'],
+  strength_2: ['bench', 'dumbbell_bench'],
+  strength_3: ['ohp', 'dumbbell_ohp'],
+  strength_4: ['barbell_row', 'dumbbell_row', 't_bar_row'],
+  strength_5: ['farmers_walk', 'kettlebell_swing'],
+}
+
+/** Helper to get slot key */
+export function exerciseSlotKey(dayType: TrainingDayType, slotIndex: number): string {
+  return `${dayType}_${slotIndex}`
+}
+
+/** User's exercise selections: slotKey -> chosen exerciseId */
+export type ExerciseSelections = Record<string, ExerciseId>
+
+/**
+ * Resolve the actual exercise list for a day, applying user selections.
+ */
+export function getSelectedExercises(
+  dayType: TrainingDayType,
+  selections: ExerciseSelections,
+): ExerciseId[] {
+  return DAY_EXERCISES[dayType].map((defaultExercise, idx) => {
+    const slotKey = exerciseSlotKey(dayType, idx)
+    return selections[slotKey] ?? defaultExercise
+  })
 }
 
 // --- 1RM & Working Weights ---
@@ -111,21 +213,15 @@ export function workingWeightKey(exerciseId: string, dayType: TrainingDayType): 
   return `${exerciseId}_${dayType}`
 }
 
-// --- Sync Meta ---
-
-export interface SyncMeta {
-  updatedAt: string
-  _dirty?: number // 1 = needs sync
-}
-
 // --- Cycle Config ---
 
-export interface CycleConfig extends SyncMeta {
+export interface CycleConfig {
   id: string
   oneRepMaxes: OneRepMaxes
   workingWeights: WorkingWeights
   startDate: string
   createdAt: string
+  updatedAt: string
 }
 
 // --- Workout Prescriptions ---
@@ -168,7 +264,7 @@ export interface ExerciseLog {
   sets: CompletedSet[]
 }
 
-export interface WorkoutLog extends SyncMeta {
+export interface WorkoutLog {
   id: string
   cycleId: string
   dayType: TrainingDayType
@@ -177,11 +273,12 @@ export interface WorkoutLog extends SyncMeta {
   exercises: ExerciseLog[]
   date: string
   notes: string
+  updatedAt: string
 }
 
 // --- AMRAP Test Results (Week 12) ---
 
-export interface AmrapResult extends SyncMeta {
+export interface AmrapResult {
   id: string
   cycleId: string
   exerciseId: string
@@ -189,6 +286,7 @@ export interface AmrapResult extends SyncMeta {
   actualReps: number
   date: string
   estimatedOneRepMax: number
+  updatedAt: string
 }
 
 // --- Week Info ---
@@ -301,13 +399,14 @@ export interface TabataWorkoutPrescription {
   intensityNote: string
 }
 
-export interface TabataLog extends SyncMeta {
+export interface TabataLog {
   id: string
   cycleId?: string
   blocks: TabataCompletedBlock[]
   date: string
   rpe: number
   notes: string
+  updatedAt: string
 }
 
 export interface TabataCompletedBlock {

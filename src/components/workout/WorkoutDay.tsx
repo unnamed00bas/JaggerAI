@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCycleStore } from '../../stores/cycleStore'
 import { useWorkoutStore } from '../../stores/workoutStore'
+import { useExerciseSelectionStore } from '../../stores/exerciseSelectionStore'
 import { useRestTimer } from '../../hooks/useRestTimer'
 import { db } from '../../lib/db'
 import { getDayPrescription, getExerciseWeight, getBlock, estimateOneRepMax } from '../../lib/juggernaut'
@@ -26,6 +27,8 @@ export function WorkoutDay() {
   const updateExerciseSet = useWorkoutStore((s) => s.updateExerciseSet)
   const finishWorkout = useWorkoutStore((s) => s.finishWorkout)
 
+  const exerciseSelections = useExerciseSelectionStore((s) => s.selections)
+
   const { secondsLeft, isRunning, start: startTimer } = useRestTimer()
 
   const [notes, setNotes] = useState('')
@@ -42,7 +45,7 @@ export function WorkoutDay() {
   useEffect(() => {
     if (!cycle || activeWorkout || workoutFinishedRef.current) return
 
-    const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights)
+    const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights, exerciseSelections)
     const exercises: ExerciseLog[] = prescription.exercises.map((ex) => {
       const weight = getExerciseWeight(ex.exerciseId, dayType, currentWeek, cycle.workingWeights)
       const sets: CompletedSet[] = Array.from({ length: ex.sets }, () => ({
@@ -99,7 +102,6 @@ export function WorkoutDay() {
           date: new Date().toISOString(),
           estimatedOneRepMax: estimateOneRepMax(amrapSet.actualWeight, amrapSet.actualReps),
           updatedAt: new Date().toISOString(),
-          _dirty: 1,
         }
         await db.amrapResults.add(result)
       }
