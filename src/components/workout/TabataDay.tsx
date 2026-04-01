@@ -188,7 +188,6 @@ export function TabataDay() {
       rpe: Number(rpe) || 0,
       notes,
       updatedAt: now,
-      _dirty: 1,
     })
 
     navigate('/')

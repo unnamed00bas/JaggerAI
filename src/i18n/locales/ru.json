@@ -28,6 +28,29 @@
     "leg_curl": "Сгибание ног",
     "cable_crunch": "Скручивания на блоке",
     "farmers_walk": "Фермерская ходьба",
+    "front_squat": "Фронтальный присед",
+    "hack_squat": "Гакк-приседание",
+    "dumbbell_bench": "Жим гантелей лёжа",
+    "machine_chest_press": "Жим в тренажёре",
+    "dumbbell_row": "Тяга гантели в наклоне",
+    "t_bar_row": "Тяга Т-грифа",
+    "dumbbell_ohp": "Жим гантелей стоя",
+    "stiff_leg_deadlift": "Мёртвая тяга",
+    "barbell_curl": "Подъём штанги на бицепс",
+    "hammer_curl": "Молотковые сгибания",
+    "overhead_tricep_ext": "Французский жим",
+    "dips": "Отжимания на брусьях",
+    "ab_wheel": "Ролик для пресса",
+    "hanging_leg_raise": "Подъём ног в висе",
+    "lat_pulldown": "Тяга верхнего блока",
+    "incline_barbell_press": "Жим штанги на наклонной",
+    "lunges": "Выпады",
+    "step_ups": "Зашагивания",
+    "cable_lateral_raise": "Разводка на блоке",
+    "nordic_curl": "Нордические сгибания",
+    "sumo_deadlift": "Тяга сумо",
+    "trap_bar_deadlift": "Тяга трэп-грифом",
+    "kettlebell_swing": "Махи гирей",
     "perLeg": "на каждую ногу",
     "short": {
       "squat": "Присед",
@@ -48,7 +71,30 @@
       "leg_curl": "Сгиб.",
       "cable_crunch": "Пресс",
       "farmers_walk": "Фермер",
-      "deadlift": "Станов."
+      "deadlift": "Станов.",
+      "front_squat": "Фронт.",
+      "hack_squat": "Гакк",
+      "dumbbell_bench": "Жим ГТ",
+      "machine_chest_press": "Тренаж.",
+      "dumbbell_row": "Тяга ГТ",
+      "t_bar_row": "Т-гриф",
+      "dumbbell_ohp": "ЖС ГТ",
+      "stiff_leg_deadlift": "Мёрт.",
+      "barbell_curl": "Биц.шт.",
+      "hammer_curl": "Молот.",
+      "overhead_tricep_ext": "Франц.",
+      "dips": "Брусья",
+      "ab_wheel": "Ролик",
+      "hanging_leg_raise": "Подъём",
+      "lat_pulldown": "Верх.бл.",
+      "incline_barbell_press": "Накл.шт.",
+      "lunges": "Выпады",
+      "step_ups": "Зашаг.",
+      "cable_lateral_raise": "Блок.р.",
+      "nordic_curl": "Нордич.",
+      "sumo_deadlift": "Сумо",
+      "trap_bar_deadlift": "Трэп",
+      "kettlebell_swing": "Гиря"
     }
   },
   "dayTypes": {
@@ -216,9 +262,9 @@
     "llmModel": "Модель",
     "llmBaseUrl": "Адрес API (Base URL)",
     "saved": "Сохранено!",
-    "sync": "Облачная синхронизация",
-    "syncEnabled": "Синхронизация включена",
-    "syncStatus": "Статус"
+    "exercises": "Выбор упражнений",
+    "exercisesDesc": "Выберите упражнения для каждого тренировочного дня",
+    "customized": "изменено"
   },
   "tabata": {
     "title": "Табата-кондиционинг",
@@ -279,22 +325,6 @@
       "enabled": "Табата-кондиционинг",
       "enabledDesc": "Добавить Табата HIIT для выносливости"
     }
-  },
-  "auth": {
-    "title": "Аккаунт",
-    "signin": "Войти",
-    "signup": "Регистрация",
-    "signOut": "Выйти",
-    "password": "Пароль",
-    "notConfigured": "Облачная синхронизация не настроена. Установите VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY."
-  },
-  "sync": {
-    "never": "Не синхронизировано",
-    "justNow": "Синхронизировано только что",
-    "minutesAgo": "Синхронизировано {{count}} мин назад",
-    "hoursAgo": "Синхронизировано {{count}}ч назад",
-    "syncing": "Синхронизация...",
-    "syncNow": "Синхронизировать"
   },
   "common": {
     "kg": "кг",

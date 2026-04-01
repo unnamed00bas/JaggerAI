@@ -4,11 +4,7 @@ import type { CycleConfig, OneRepMaxes } from '../types'
 import { workingWeightKey } from '../types'
 import { db } from '../lib/db'
 import { calculateInitialWorkingWeights, getWeightIncrement, roundWeight, recalculateWorkingWeights } from '../lib/juggernaut'
-import { useSyncStore } from './syncStore'
-
-function deferSync() {
-  setTimeout(() => useSyncStore.getState().triggerSync(), 2000)
-}
+import { useExerciseSelectionStore } from './exerciseSelectionStore'
 
 interface CycleState {
   activeCycleId: string | null
@@ -36,7 +32,8 @@ export const useCycleStore = create<CycleState>()(
       createCycle: async (oneRepMaxes) => {
         const id = crypto.randomUUID()
         const now = new Date().toISOString()
-        const workingWeights = calculateInitialWorkingWeights(oneRepMaxes)
+        const selections = useExerciseSelectionStore.getState().selections
+        const workingWeights = calculateInitialWorkingWeights(oneRepMaxes, selections)
         const cycle: CycleConfig = {
           id,
           oneRepMaxes,
@@ -44,11 +41,9 @@ export const useCycleStore = create<CycleState>()(
           startDate: now,
           createdAt: now,
           updatedAt: now,
-          _dirty: 1,
         }
         await db.cycles.add(cycle)
         set({ activeCycleId: id, currentWeek: 1 })
-        deferSync()
         return id
       },
 
@@ -66,9 +61,7 @@ export const useCycleStore = create<CycleState>()(
             [key]: roundWeight(newWeight),
           },
           updatedAt: new Date().toISOString(),
-          _dirty: 1,
         })
-        deferSync()
       },
 
       progressExercise: async (cycleId, exerciseId, dayType) => {
@@ -86,10 +79,8 @@ export const useCycleStore = create<CycleState>()(
             [key]: newWeight,
           },
           updatedAt: new Date().toISOString(),
-          _dirty: 1,
         })
 
-        deferSync()
         return newWeight
       },
 
@@ -110,7 +101,8 @@ export const useCycleStore = create<CycleState>()(
         const oldCycle = await db.cycles.get(activeCycleId)
         if (!oldCycle) return null
 
-        const { oneRepMaxes, workingWeights } = recalculateWorkingWeights(oldCycle.oneRepMaxes)
+        const selections = useExerciseSelectionStore.getState().selections
+        const { oneRepMaxes, workingWeights } = recalculateWorkingWeights(oldCycle.oneRepMaxes, undefined, selections)
 
         const id = crypto.randomUUID()
         const now = new Date().toISOString()
@@ -121,11 +113,9 @@ export const useCycleStore = create<CycleState>()(
           startDate: now,
           createdAt: now,
           updatedAt: now,
-          _dirty: 1,
         }
         await db.cycles.add(cycle)
         set({ activeCycleId: id, currentWeek: 1 })
-        deferSync()
         return id
       },
     }),

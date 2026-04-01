@@ -2,17 +2,19 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useCycleStore } from '../../stores/cycleStore'
+import { useExerciseSelectionStore } from '../../stores/exerciseSelectionStore'
 import { calculateInitialWorkingWeights } from '../../lib/juggernaut'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import type { MainLift, OneRepMaxes, TrainingDayType } from '../../types'
-import { MAIN_LIFTS, DAY_EXERCISES, workingWeightKey } from '../../types'
+import { MAIN_LIFTS, workingWeightKey, getSelectedExercises } from '../../types'
 
 export function CycleSetup() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const createCycle = useCycleStore((s) => s.createCycle)
+  const exerciseSelections = useExerciseSelectionStore((s) => s.selections)
 
   const [oneRepMaxes, setOneRepMaxes] = useState<Record<MainLift, string>>({
     squat: '',
@@ -45,7 +47,7 @@ export function CycleSetup() {
         bench: Number(oneRepMaxes.bench),
         ohp: Number(oneRepMaxes.ohp),
         deadlift: Number(oneRepMaxes.deadlift),
-      })
+      }, exerciseSelections)
     : null
 
   return (
@@ -87,7 +89,7 @@ export function CycleSetup() {
                 {t(`dayTypes.${dayType}`)} ({t(`dayTypes.${dayType}Short`)})
               </h3>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                {DAY_EXERCISES[dayType].slice(0, 5).map((exerciseId) => {
+                {getSelectedExercises(dayType, exerciseSelections).slice(0, 5).map((exerciseId) => {
                   const key = workingWeightKey(exerciseId, dayType)
                   const weight = preview[key]
                   if (!weight && weight !== 0) return null

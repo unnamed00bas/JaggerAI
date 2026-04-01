@@ -8,8 +8,9 @@ import type {
   WorkingWeights,
   WeekInfo,
   ExerciseCategory,
+  ExerciseSelections,
 } from '../../types'
-import { EXERCISES, DAY_EXERCISES, DELOAD_WEEKS, AMRAP_TEST_WEEK, workingWeightKey } from '../../types'
+import { EXERCISES, DAY_EXERCISES, DELOAD_WEEKS, AMRAP_TEST_WEEK, workingWeightKey, getSelectedExercises } from '../../types'
 
 // ─────────────────────────────────────────────────────────
 // 3-Day Undulating Periodization Calculator
@@ -56,43 +57,73 @@ const INITIAL_PERCENTAGES: Record<TrainingDayType, number> = {
 function estimateAccessoryWeight(oneRepMaxes: OneRepMaxes, exerciseId: ExerciseId): number {
   switch (exerciseId) {
     case 'barbell_row':       return roundWeight(oneRepMaxes.deadlift * 0.50)
+    case 'dumbbell_row':      return roundWeight(oneRepMaxes.deadlift * 0.25)
+    case 't_bar_row':         return roundWeight(oneRepMaxes.deadlift * 0.45)
     case 'romanian_deadlift': return roundWeight(oneRepMaxes.deadlift * 0.55)
+    case 'stiff_leg_deadlift':return roundWeight(oneRepMaxes.deadlift * 0.50)
     case 'dumbbell_curl':     return roundWeight(oneRepMaxes.bench * 0.15)
+    case 'barbell_curl':      return roundWeight(oneRepMaxes.bench * 0.30)
+    case 'hammer_curl':       return roundWeight(oneRepMaxes.bench * 0.15)
     case 'tricep_pushdown':   return roundWeight(oneRepMaxes.bench * 0.30)
+    case 'overhead_tricep_ext': return roundWeight(oneRepMaxes.bench * 0.25)
+    case 'dips':              return 0 // bodyweight
     case 'leg_press':         return roundWeight(oneRepMaxes.squat * 1.20)
-    case 'pullup':            return 0 // bodyweight, 0 = no added weight
-    case 'incline_db_press':  return roundWeight(oneRepMaxes.bench * 0.30) // per dumbbell
+    case 'pullup':            return 0 // bodyweight
+    case 'lat_pulldown':      return roundWeight(oneRepMaxes.deadlift * 0.40)
+    case 'incline_db_press':  return roundWeight(oneRepMaxes.bench * 0.30)
+    case 'incline_barbell_press': return roundWeight(oneRepMaxes.bench * 0.65)
     case 'cable_row':         return roundWeight(oneRepMaxes.deadlift * 0.35)
-    case 'bulgarian_split_squat': return roundWeight(oneRepMaxes.squat * 0.25) // per dumbbell
+    case 'bulgarian_split_squat': return roundWeight(oneRepMaxes.squat * 0.25)
+    case 'lunges':            return roundWeight(oneRepMaxes.squat * 0.25)
+    case 'step_ups':          return roundWeight(oneRepMaxes.squat * 0.20)
     case 'lateral_raise':     return roundWeight(Math.max(5, oneRepMaxes.ohp * 0.10))
+    case 'cable_lateral_raise': return roundWeight(Math.max(5, oneRepMaxes.ohp * 0.10))
     case 'leg_curl':          return roundWeight(oneRepMaxes.squat * 0.25)
+    case 'nordic_curl':       return 0 // bodyweight
     case 'cable_crunch':      return roundWeight(oneRepMaxes.squat * 0.20)
-    case 'farmers_walk':      return roundWeight(oneRepMaxes.deadlift * 0.35) // per hand
+    case 'ab_wheel':          return 0 // bodyweight
+    case 'hanging_leg_raise': return 0 // bodyweight
+    case 'farmers_walk':      return roundWeight(oneRepMaxes.deadlift * 0.35)
+    case 'kettlebell_swing':  return roundWeight(oneRepMaxes.deadlift * 0.20)
     default:                  return 20
   }
 }
 
-export function calculateInitialWorkingWeights(oneRepMaxes: OneRepMaxes): WorkingWeights {
+export function calculateInitialWorkingWeights(
+  oneRepMaxes: OneRepMaxes,
+  selections?: ExerciseSelections,
+): WorkingWeights {
   const weights: WorkingWeights = {}
 
   // Main lifts: calculate per day type using percentages
   const mainLiftMap: Record<string, keyof OneRepMaxes> = {
     squat: 'squat',
+    front_squat: 'squat',
+    hack_squat: 'squat',
     bench: 'bench',
+    dumbbell_bench: 'bench',
+    machine_chest_press: 'bench',
     ohp: 'ohp',
+    dumbbell_ohp: 'ohp',
     deadlift: 'deadlift',
+    sumo_deadlift: 'deadlift',
+    trap_bar_deadlift: 'deadlift',
   }
 
-  for (const [dayType, exercises] of Object.entries(DAY_EXERCISES) as [TrainingDayType, ExerciseId[]][]) {
+  for (const dayType of ['hypertrophy', 'volume', 'strength'] as TrainingDayType[]) {
+    const exercises = selections
+      ? getSelectedExercises(dayType, selections)
+      : DAY_EXERCISES[dayType]
+
     for (const exerciseId of exercises) {
       const key = workingWeightKey(exerciseId, dayType)
+      if (weights[key] !== undefined) continue // already calculated
+
       const oneRmKey = mainLiftMap[exerciseId]
 
       if (oneRmKey) {
-        // Main lift: use day-specific percentage of 1RM
         weights[key] = roundWeight(oneRepMaxes[oneRmKey] * INITIAL_PERCENTAGES[dayType])
       } else {
-        // Accessory/secondary: estimate from related 1RM
         weights[key] = estimateAccessoryWeight(oneRepMaxes, exerciseId)
       }
     }
@@ -146,14 +177,16 @@ function getAccessoryPrescription(week: number, dayType: TrainingDayType, exerci
     return { sets: 0, repsMin: 0, repsMax: 0 } // skip accessories on deload/test
   }
 
-  // Time-based exercises
-  if (exerciseId === 'plank') {
+  const def = EXERCISES[exerciseId]
+
+  // Time-based exercises (plank)
+  if (def?.isTimeBased) {
     const block = getBlock(week)
     return { sets: 3, repsMin: block >= 3 ? 45 : 30, repsMax: block >= 3 ? 45 : 30 } // seconds
   }
 
-  // Distance-based exercises
-  if (exerciseId === 'farmers_walk') {
+  // Distance-based exercises (farmers walk)
+  if (def?.isDistanceBased) {
     return { sets: 3, repsMin: 20, repsMax: 30 } // meters
   }
 
@@ -204,11 +237,14 @@ export function getDayPrescription(
   week: number,
   dayType: TrainingDayType,
   _workingWeights?: WorkingWeights,
+  selections?: ExerciseSelections,
 ): DayPrescription {
   const block = getBlock(week)
   const deload = isDeloadWeek(week)
   const amrapTest = isAmrapTestWeek(week)
-  const exercises = DAY_EXERCISES[dayType]
+  const exercises = selections
+    ? getSelectedExercises(dayType, selections)
+    : DAY_EXERCISES[dayType]
 
   let effortNote: string
   if (amrapTest && dayType !== 'volume') {
@@ -250,7 +286,7 @@ export function getDayPrescription(
       notes = `${entry.repsMin}-${entry.repsMax}s`
     } else if (def.isDistanceBased) {
       notes = `${entry.repsMin}-${entry.repsMax}m`
-    } else if (exerciseId === 'bulgarian_split_squat') {
+    } else if (['bulgarian_split_squat', 'lunges', 'step_ups'].includes(exerciseId)) {
       notes = 'exercises.perLeg'
     }
 
@@ -370,6 +406,7 @@ export function calculateNewOneRepMax(weight: number, reps: number): number {
 export function recalculateWorkingWeights(
   oneRepMaxes: OneRepMaxes,
   boostPercent: number = 0.05, // 5% increase for next cycle
+  selections?: ExerciseSelections,
 ): { oneRepMaxes: OneRepMaxes; workingWeights: WorkingWeights } {
   const boosted: OneRepMaxes = {
     squat: roundWeight(oneRepMaxes.squat * (1 + boostPercent)),
@@ -379,6 +416,6 @@ export function recalculateWorkingWeights(
   }
   return {
     oneRepMaxes: boosted,
-    workingWeights: calculateInitialWorkingWeights(boosted),
+    workingWeights: calculateInitialWorkingWeights(boosted, selections),
   }
 }
