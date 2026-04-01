@@ -1,12 +1,11 @@
 import { getProvider } from './provider'
 import { buildTrainerRecommendationPrompt } from './coachPrompt'
 import type { LlmMessage } from './provider'
-import type { Wave, Phase, CycleConfig, AmrapResult, WorkoutLog, TabataLog, WorkoutType } from '../../types'
+import type { CycleConfig, AmrapResult, WorkoutLog, TabataLog, WorkoutType } from '../../types'
 
 interface TrainerRecommendationParams {
-  wave: Wave
-  phase: Phase
   week: number
+  block: number
   cycle?: CycleConfig
   amrapResults?: AmrapResult[]
   workoutLogs?: WorkoutLog[]
@@ -41,7 +40,6 @@ export async function generateTrainerRecommendation(params: TrainerRecommendatio
   const llm = getProvider(params.provider)
   if (!llm) throw new Error('LLM provider not configured')
 
-  // Compute recovery context from logs
   const allLogs = params.workoutLogs ?? []
   const tabataLogs = params.tabataLogs ?? []
 
@@ -49,7 +47,6 @@ export async function generateTrainerRecommendation(params: TrainerRecommendatio
   const daysSinceLastAerobic = params.daysSinceLastAerobic ?? computeDaysSince(tabataLogs)
   const daysSinceLastStretch = params.daysSinceLastStretch ?? null
 
-  // Build recent workout types from logs
   const recentWorkoutTypes: { type: WorkoutType; date: string }[] = params.recentWorkoutTypes ?? []
   if (!recentWorkoutTypes.length) {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -66,7 +63,7 @@ export async function generateTrainerRecommendation(params: TrainerRecommendatio
     recentWorkoutTypes.sort((a, b) => a.date.localeCompare(b.date))
   }
 
-  const defaultEquipment = ['barbell', 'dumbbells', 'kettlebell', 'pull-up bar']
+  const defaultEquipment = ['barbell', 'dumbbells', 'kettlebell', 'pull-up bar', 'cable machine', 'leg press']
   if (params.tabataEquipment === 'cardio_machines' || params.tabataEquipment === 'mixed') {
     defaultEquipment.push('assault bike', 'rowing machine')
   }
@@ -106,10 +103,7 @@ export async function generateTrainerRecommendation(params: TrainerRecommendatio
       : ' Choose the optimal workout type.'
 
   const messages: LlmMessage[] = [
-    {
-      role: 'system',
-      content: systemPrompt,
-    },
+    { role: 'system', content: systemPrompt },
     {
       role: 'user',
       content: params.language === 'ru'

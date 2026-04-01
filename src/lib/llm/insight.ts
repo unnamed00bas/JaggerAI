@@ -1,18 +1,13 @@
 import { getProvider } from './provider'
 import { buildAmrapInsightPrompt } from './coachPrompt'
 import type { LlmMessage } from './provider'
-import type { Lift, Wave, TrainingMaxes, CycleConfig, AmrapResult } from '../../types'
+import type { CycleConfig, AmrapResult } from '../../types'
 import { estimateOneRepMax } from '../juggernaut'
 
 interface AmrapInsightParams {
-  lift: Lift
-  wave: Wave
+  exerciseId: string
   weight: number
-  targetReps: number
   actualReps: number
-  oldTM: number
-  newTM: number
-  trainingMaxes: TrainingMaxes
   cycle?: CycleConfig
   amrapResults?: AmrapResult[]
   provider: string
@@ -27,7 +22,6 @@ export async function generateAmrapInsight(params: AmrapInsightParams): Promise<
   if (!llm) throw new Error('LLM provider not configured')
 
   const e1rm = estimateOneRepMax(params.weight, params.actualReps)
-  const repsOverTarget = params.actualReps - params.targetReps
 
   const systemPrompt = buildAmrapInsightPrompt({
     cycle: params.cycle,
@@ -36,19 +30,15 @@ export async function generateAmrapInsight(params: AmrapInsightParams): Promise<
   })
 
   const messages: LlmMessage[] = [
-    {
-      role: 'system',
-      content: systemPrompt,
-    },
+    { role: 'system', content: systemPrompt },
     {
       role: 'user',
       content: [
-        `AMRAP result just completed:`,
-        `Lift: ${params.lift}`,
-        `Wave: ${params.wave}, Weight: ${params.weight} kg`,
-        `Target reps: ${params.targetReps}, Actual reps: ${params.actualReps} (${repsOverTarget > 0 ? '+' : ''}${repsOverTarget} over target)`,
+        `AMRAP test result:`,
+        `Exercise: ${params.exerciseId}`,
+        `Weight: ${params.weight} kg`,
+        `Reps: ${params.actualReps}`,
         `Estimated 1RM: ${e1rm.toFixed(1)} kg`,
-        `Training Max change: ${params.oldTM} kg → ${params.newTM} kg`,
       ].join('\n'),
     },
   ]

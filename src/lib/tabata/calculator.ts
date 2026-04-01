@@ -1,6 +1,5 @@
 import type {
-  Wave,
-  Phase,
+  Block,
   TabataEquipment,
   TabataExerciseId,
   TabataBlock,
@@ -10,117 +9,75 @@ import type {
 import { TABATA_EXERCISES } from '../../types'
 
 // --- Tabata Programming Logic ---
-// Integrates with the 16-week Juggernaut Method cycle.
+// Standalone conditioning module — works with or without the main cycle.
 //
-// Philosophy:
-// - Tabata is used as a conditioning finisher AFTER strength work
-// - Volume/intensity scales inversely to the strength phase demands
-// - Deload weeks use lighter Tabata or rest entirely
-// - Exercise selection avoids fatiguing muscles used in the day's main lift
+// Uses the 12-week cycle block structure:
+//   Block 1 (wk 1-4): Foundation → moderate Tabata (2 blocks)
+//   Block 2 (wk 5-8): Development → higher Tabata (2-3 blocks)
+//   Block 3 (wk 9-12): Peak/Test → lighter Tabata (1-2 blocks)
+//
+// Deload weeks (4, 8) and AMRAP test week (12) use minimal volume.
 //
 // Research basis:
 // - Tabata (1996): 20s on / 10s off × 8 rounds = 4 min
 // - Concurrent training studies show Tabata-style HIIT produces less
 //   interference with strength gains than steady-state cardio
-// - Progressive overload: 1 block (wk 1-2) → 2 blocks (wk 3-4) → 3 blocks (wk 5-6)
 
 const STANDARD_WORK = 20
 const STANDARD_REST = 10
 const ROUNDS_PER_BLOCK = 8
 
-// --- Phase-based volume prescription ---
-// Accumulation: high volume strength → moderate Tabata (2 blocks)
-// Intensification: heavy strength → light Tabata (1 block)
-// Realization: AMRAP week → minimal Tabata (1 block, lower intensity)
-// Deload: recovery → optional light Tabata (1 block) or skip
-
-interface TabataPhaseConfig {
+// --- Block-based volume prescription ---
+interface BlockConfig {
   blocks: number
   intensityNote: string
 }
 
-const PHASE_CONFIGS: Record<Phase, TabataPhaseConfig> = {
-  accumulation: {
-    blocks: 2,
-    intensityNote: 'tabata.intensity.accumulation',
-  },
-  intensification: {
-    blocks: 1,
-    intensityNote: 'tabata.intensity.intensification',
-  },
-  realization: {
-    blocks: 1,
-    intensityNote: 'tabata.intensity.realization',
-  },
-  deload: {
-    blocks: 1,
-    intensityNote: 'tabata.intensity.deload',
-  },
+const BLOCK_CONFIGS: Record<Block, BlockConfig> = {
+  1: { blocks: 2, intensityNote: 'tabata.intensity.block1' },
+  2: { blocks: 2, intensityNote: 'tabata.intensity.block2' },
+  3: { blocks: 1, intensityNote: 'tabata.intensity.block3' },
 }
 
-// --- Wave-based progression ---
-// As waves get heavier (10s → 3s), Tabata focus shifts:
-// 10s wave: general conditioning, higher Tabata volume
-// 8s wave: balanced
-// 5s wave: power-oriented exercises
-// 3s wave: minimal conditioning, CNS recovery priority
-
-const WAVE_BLOCK_MODIFIER: Record<Wave, number> = {
-  '10s': 1,  // +1 block bonus
-  '8s': 0,
-  '5s': 0,
-  '3s': -1,  // -1 block (minimum 1)
-}
+// Deload / AMRAP test weeks get reduced volume
+const DELOAD_CONFIG: BlockConfig = { blocks: 1, intensityNote: 'tabata.intensity.deload' }
 
 // --- Exercise selection by equipment ---
 
 function getExercisesForEquipment(equipment: TabataEquipment): TabataExercise[] {
-  if (equipment === 'kettlebell') {
-    return TABATA_EXERCISES.filter((e) => e.equipment === 'kettlebell')
-  }
-  if (equipment === 'bodyweight') {
-    return TABATA_EXERCISES.filter((e) => e.equipment === 'bodyweight')
-  }
-  if (equipment === 'cardio_machines') {
-    return TABATA_EXERCISES.filter((e) => e.equipment === 'cardio_machines')
-  }
-  // mixed: all exercises
-  return [...TABATA_EXERCISES]
+  if (equipment === 'mixed') return [...TABATA_EXERCISES]
+  return TABATA_EXERCISES.filter((e) => e.equipment === equipment)
 }
 
 // --- Deterministic exercise selection ---
-// Uses wave + phase + block index to select exercises in a rotating pattern
-// so the full cycle has variety without randomness
+// Uses week + blockIndex to select exercises in a rotating pattern
 
 function selectExercise(
   available: TabataExercise[],
-  wave: Wave,
-  phase: Phase,
+  week: number,
   blockIndex: number,
 ): TabataExerciseId {
-  const waveOffset = { '10s': 0, '8s': 3, '5s': 6, '3s': 9 }[wave]
-  const phaseOffset = { accumulation: 0, intensification: 1, realization: 2, deload: 3 }[phase]
-  const index = (waveOffset + phaseOffset + blockIndex) % available.length
+  const index = (week * 3 + blockIndex) % available.length
   return available[index].id
 }
 
 // --- Main API ---
 
 export function getTabataWorkout(
-  wave: Wave,
-  phase: Phase,
-  weekNumber: number,
+  week: number,
+  block: Block,
   equipment: TabataEquipment = 'mixed',
+  isDeload = false,
+  isAmrapTest = false,
 ): TabataWorkoutPrescription {
-  const phaseConfig = PHASE_CONFIGS[phase]
-  const waveModifier = WAVE_BLOCK_MODIFIER[wave]
-  const blockCount = Math.max(1, phaseConfig.blocks + waveModifier)
+  const config = (isDeload || isAmrapTest) ? DELOAD_CONFIG : BLOCK_CONFIGS[block]
+  const blockCount = config.blocks
 
   const available = getExercisesForEquipment(equipment)
   const blocks: TabataBlock[] = []
 
   for (let i = 0; i < blockCount; i++) {
-    const exerciseId = selectExercise(available, wave, phase, i)
+    const exerciseId = selectExercise(available, week, i)
     blocks.push({
       exerciseId,
       rounds: ROUNDS_PER_BLOCK,
@@ -129,16 +86,13 @@ export function getTabataWorkout(
     })
   }
 
-  const blockMinutes = (STANDARD_WORK + STANDARD_REST) * ROUNDS_PER_BLOCK / 60 // 4 min per block
+  const blockMinutes = (STANDARD_WORK + STANDARD_REST) * ROUNDS_PER_BLOCK / 60
   const totalMinutes = Math.ceil(blockMinutes * blockCount)
 
   return {
-    wave,
-    phase,
-    weekNumber,
     blocks,
     totalMinutes,
-    intensityNote: phaseConfig.intensityNote,
+    intensityNote: config.intensityNote,
   }
 }
 
@@ -147,38 +101,28 @@ export function getTabataWorkout(
 export function generateTabataCycle(
   equipment: TabataEquipment = 'mixed',
 ): TabataWorkoutPrescription[] {
-  const waves: Wave[] = ['10s', '8s', '5s', '3s']
-  const phases: Phase[] = ['accumulation', 'intensification', 'realization', 'deload']
   const plan: TabataWorkoutPrescription[] = []
-  let weekNumber = 1
+  const deloadWeeks = [4, 8]
+  const amrapWeek = 12
 
-  for (const wave of waves) {
-    for (const phase of phases) {
-      plan.push(getTabataWorkout(wave, phase, weekNumber, equipment))
-      weekNumber++
-    }
+  for (let week = 1; week <= 12; week++) {
+    const block: Block = week <= 4 ? 1 : week <= 8 ? 2 : 3
+    const isDeload = deloadWeeks.includes(week)
+    const isAmrap = week === amrapWeek
+    plan.push(getTabataWorkout(week, block, equipment, isDeload, isAmrap))
   }
 
   return plan
 }
 
-// --- Recommended weekly schedule ---
-// Returns how many Tabata sessions per week based on phase
-// Accumulation: 2-3 sessions/week (after upper body days ideally)
-// Intensification: 2 sessions/week
-// Realization: 1 session/week (before AMRAP day, skip day before test)
-// Deload: 1-2 light sessions
+// --- Recommended weekly Tabata frequency based on block ---
 
-export function getTabataFrequency(phase: Phase): { min: number; max: number } {
-  switch (phase) {
-    case 'accumulation':
-      return { min: 2, max: 3 }
-    case 'intensification':
-      return { min: 1, max: 2 }
-    case 'realization':
-      return { min: 1, max: 1 }
-    case 'deload':
-      return { min: 1, max: 2 }
+export function getTabataFrequency(block: Block, isDeload: boolean): { min: number; max: number } {
+  if (isDeload) return { min: 1, max: 1 }
+  switch (block) {
+    case 1: return { min: 2, max: 3 }
+    case 2: return { min: 2, max: 2 }
+    case 3: return { min: 1, max: 2 }
   }
 }
 

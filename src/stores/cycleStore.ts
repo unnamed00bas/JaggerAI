@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { CycleConfig, Wave, Lift } from '../types'
+import type { CycleConfig, OneRepMaxes } from '../types'
+import { workingWeightKey } from '../types'
 import { db } from '../lib/db'
-import { calculateNewTrainingMax } from '../lib/juggernaut'
+import { calculateInitialWorkingWeights, getWeightIncrement, roundWeight, recalculateWorkingWeights } from '../lib/juggernaut'
 import { useSyncStore } from './syncStore'
 
 function deferSync() {
@@ -16,8 +17,9 @@ interface CycleState {
   setActiveCycleId: (id: string | null) => void
   setCurrentWeek: (week: number) => void
 
-  createCycle: (config: Omit<CycleConfig, 'id' | 'createdAt' | 'updatedAt' | '_dirty'>) => Promise<string>
-  updateTrainingMax: (cycleId: string, lift: Lift, wave: Wave, amrapReps: number) => Promise<number>
+  createCycle: (oneRepMaxes: OneRepMaxes) => Promise<string>
+  updateWorkingWeight: (exerciseId: string, dayType: string, newWeight: number) => Promise<void>
+  progressExercise: (cycleId: string, exerciseId: string, dayType: string) => Promise<number>
   resetCycle: () => Promise<void>
   startNextCycle: () => Promise<string | null>
 }
@@ -31,12 +33,15 @@ export const useCycleStore = create<CycleState>()(
       setActiveCycleId: (id) => set({ activeCycleId: id }),
       setCurrentWeek: (week) => set({ currentWeek: week }),
 
-      createCycle: async (config) => {
+      createCycle: async (oneRepMaxes) => {
         const id = crypto.randomUUID()
         const now = new Date().toISOString()
+        const workingWeights = calculateInitialWorkingWeights(oneRepMaxes)
         const cycle: CycleConfig = {
-          ...config,
           id,
+          oneRepMaxes,
+          workingWeights,
+          startDate: now,
           createdAt: now,
           updatedAt: now,
           _dirty: 1,
@@ -47,24 +52,45 @@ export const useCycleStore = create<CycleState>()(
         return id
       },
 
-      updateTrainingMax: async (cycleId, lift, wave, amrapReps) => {
+      updateWorkingWeight: async (exerciseId, dayType, newWeight) => {
+        const { activeCycleId } = useCycleStore.getState()
+        if (!activeCycleId) return
+
+        const cycle = await db.cycles.get(activeCycleId)
+        if (!cycle) return
+
+        const key = workingWeightKey(exerciseId, dayType as 'hypertrophy' | 'volume' | 'strength')
+        await db.cycles.update(activeCycleId, {
+          workingWeights: {
+            ...cycle.workingWeights,
+            [key]: roundWeight(newWeight),
+          },
+          updatedAt: new Date().toISOString(),
+          _dirty: 1,
+        })
+        deferSync()
+      },
+
+      progressExercise: async (cycleId, exerciseId, dayType) => {
         const cycle = await db.cycles.get(cycleId)
         if (!cycle) throw new Error('Cycle not found')
 
-        const oldTM = cycle.trainingMaxes[lift]
-        const newTM = calculateNewTrainingMax(oldTM, wave, amrapReps, lift)
+        const key = workingWeightKey(exerciseId, dayType as 'hypertrophy' | 'volume' | 'strength')
+        const currentWeight = cycle.workingWeights[key] ?? 0
+        const increment = getWeightIncrement(exerciseId)
+        const newWeight = roundWeight(currentWeight + increment)
 
         await db.cycles.update(cycleId, {
-          trainingMaxes: {
-            ...cycle.trainingMaxes,
-            [lift]: newTM,
+          workingWeights: {
+            ...cycle.workingWeights,
+            [key]: newWeight,
           },
           updatedAt: new Date().toISOString(),
           _dirty: 1,
         })
 
         deferSync()
-        return newTM
+        return newWeight
       },
 
       resetCycle: async () => {
@@ -72,7 +98,6 @@ export const useCycleStore = create<CycleState>()(
         if (activeCycleId) {
           await db.workoutLogs.where('cycleId').equals(activeCycleId).delete()
           await db.amrapResults.where('cycleId').equals(activeCycleId).delete()
-          await db.tabataLogs.where('cycleId').equals(activeCycleId).delete()
           await db.cycles.delete(activeCycleId)
         }
         set({ activeCycleId: null, currentWeek: 1 })
@@ -85,12 +110,14 @@ export const useCycleStore = create<CycleState>()(
         const oldCycle = await db.cycles.get(activeCycleId)
         if (!oldCycle) return null
 
+        const { oneRepMaxes, workingWeights } = recalculateWorkingWeights(oldCycle.oneRepMaxes)
+
         const id = crypto.randomUUID()
         const now = new Date().toISOString()
         const cycle: CycleConfig = {
           id,
-          variant: oldCycle.variant,
-          trainingMaxes: { ...oldCycle.trainingMaxes },
+          oneRepMaxes,
+          workingWeights,
           startDate: now,
           createdAt: now,
           updatedAt: now,

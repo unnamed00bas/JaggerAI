@@ -1,17 +1,15 @@
 import { getProvider } from './provider'
 import { buildWeeklySummaryPrompt } from './coachPrompt'
 import type { LlmMessage } from './provider'
-import type { WorkoutLog, Wave, Phase, TrainingMaxes, CycleConfig, AmrapResult, TabataLog } from '../../types'
+import type { WorkoutLog, TrainingDayType, Block, WorkingWeights, CycleConfig } from '../../types'
 
 interface WeeklySummaryParams {
-  wave: Wave
-  phase: Phase
   week: number
+  block: Block
+  dayType: TrainingDayType
   logs: WorkoutLog[]
-  trainingMaxes: TrainingMaxes
+  workingWeights: WorkingWeights
   cycle?: CycleConfig
-  amrapResults?: AmrapResult[]
-  tabataLogs?: TabataLog[]
   provider: string
   apiKey: string
   model: string
@@ -25,31 +23,26 @@ export async function generateWeeklySummary(params: WeeklySummaryParams): Promis
 
   const systemPrompt = buildWeeklySummaryPrompt({
     cycle: params.cycle,
-    amrapResults: params.amrapResults,
     workoutLogs: params.logs,
-    tabataLogs: params.tabataLogs,
     language: params.language,
     currentWeek: params.week,
   })
 
   const logsSummary = params.logs.map((log) => {
-    const totalTonnage = log.sets.reduce(
-      (sum, s) => sum + (s.completed ? s.actualWeight * s.actualReps : 0),
-      0,
-    )
-    const completedSets = log.sets.filter((s) => s.completed).length
-    return `${log.lift}: ${completedSets}/${log.sets.length} sets completed, tonnage ${Math.round(totalTonnage)} kg`
+    const exercises = log.exercises.map(e => {
+      const completedSets = e.sets.filter(s => s.completed).length
+      const tonnage = e.sets.reduce((sum, s) => s.completed ? sum + s.actualWeight * s.actualReps : sum, 0)
+      return `${e.exerciseId}: ${completedSets}/${e.sets.length} sets, ${Math.round(tonnage)} kg`
+    }).join('; ')
+    return `${log.dayType} (W${log.week}): ${exercises}`
   }).join('\n')
 
   const messages: LlmMessage[] = [
-    {
-      role: 'system',
-      content: systemPrompt,
-    },
+    { role: 'system', content: systemPrompt },
     {
       role: 'user',
       content: [
-        `Week ${params.week} completed (${params.wave} wave, ${params.phase} phase):`,
+        `Week ${params.week} completed (Block ${params.block}):`,
         '',
         logsSummary,
         '',

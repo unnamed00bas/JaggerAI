@@ -3,26 +3,21 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCycleStore } from '../stores/cycleStore'
-import { db } from '../lib/db'
-import { getCycleWeeks, getWeightForSet, getWorkoutPrescription } from '../lib/juggernaut'
-import { getTabataWorkout, getTabataFrequency, getBlockDurationSeconds } from '../lib/tabata'
-import { generateWeeklySummary } from '../lib/llm'
 import { useSettingsStore } from '../stores/settingsStore'
+import { db } from '../lib/db'
+import { getCycleWeeks, getDayPrescription, getExerciseWeight, getBlock } from '../lib/juggernaut'
+import { generateWeeklySummary } from '../lib/llm'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
 import { TrainerRecommendation } from './ai/TrainerRecommendation'
-import type { Lift, WorkoutLog, TabataLog, AmrapResult } from '../types'
-
-const TOTAL_WEEKS = 16
+import type { WorkoutLog } from '../types'
+import { TRAINING_DAYS, TOTAL_WEEKS } from '../types'
 
 export function Dashboard() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const activeCycleId = useCycleStore((s) => s.activeCycleId)
   const currentWeek = useCycleStore((s) => s.currentWeek)
-  const variant = useSettingsStore((s) => s.variant)
-  const tabataEnabled = useSettingsStore((s) => s.tabataEnabled)
-  const tabataEquipment = useSettingsStore((s) => s.tabataEquipment)
   const llmProvider = useSettingsStore((s) => s.llmProvider)
   const llmApiKey = useSettingsStore((s) => s.llmApiKey)
   const llmModel = useSettingsStore((s) => s.llmModel)
@@ -48,31 +43,6 @@ export function Dashboard() {
     [activeCycleId, currentWeek],
   )
 
-  const amrapResults = useLiveQuery(
-    () => (activeCycleId
-      ? db.amrapResults.where('cycleId').equals(activeCycleId).sortBy('date')
-      : Promise.resolve([] as AmrapResult[])),
-    [activeCycleId],
-  )
-
-  const allTabataLogs = useLiveQuery(
-    () => (activeCycleId
-      ? db.tabataLogs.where('cycleId').equals(activeCycleId).sortBy('date')
-      : Promise.resolve([] as TabataLog[])),
-    [activeCycleId],
-  )
-
-  const tabataLog = useLiveQuery(
-    () => (activeCycleId && tabataEnabled
-      ? db.tabataLogs
-          .where('cycleId')
-          .equals(activeCycleId)
-          .filter((log: TabataLog) => log.week === currentWeek)
-          .first()
-      : Promise.resolve(undefined)),
-    [activeCycleId, currentWeek, tabataEnabled],
-  )
-
   if (!cycle) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
@@ -92,10 +62,20 @@ export function Dashboard() {
   const weekInfo = weeks[currentWeek - 1]
   if (!weekInfo) return null
 
-  const lifts: Lift[] = ['squat', 'bench', 'ohp', 'deadlift']
-  const completedLifts = new Set(weekLogs?.map((log) => log.lift) ?? [])
-  const completedCount = completedLifts.size
-  const totalCount = lifts.length
+  const block = getBlock(currentWeek)
+  const completedDays = new Set(weekLogs?.map((log) => log.dayType) ?? [])
+  const completedCount = completedDays.size
+  const totalCount = TRAINING_DAYS.length
+
+  // Determine tip key
+  let tipKey: string
+  if (weekInfo.isAmrapTest) {
+    tipKey = 'amrap'
+  } else if (weekInfo.isDeload) {
+    tipKey = 'deload'
+  } else {
+    tipKey = `block${block}`
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -106,19 +86,23 @@ export function Dashboard() {
         </span>
       </div>
 
+      {/* Block & Week Banner */}
       <div className="bg-primary-600 dark:bg-primary-800 text-white rounded-2xl p-4 shadow-sm">
         <div className="flex justify-between items-center">
           <div>
-            <div className="text-sm opacity-80">{t(`waves.${weekInfo.wave}`)}</div>
-            <div className="text-lg font-bold">{t(`phases.${weekInfo.phase}`)}</div>
+            <div className="text-sm opacity-80">{t(`blocks.${block}`)}</div>
+            <div className="text-lg font-bold">
+              {weekInfo.isAmrapTest
+                ? t('dashboard.tips.amrapTitle')
+                : weekInfo.isDeload
+                  ? t('dashboard.tips.deloadTitle')
+                  : t('cycle.week', { number: currentWeek })}
+            </div>
           </div>
           <div className="text-3xl font-bold opacity-20">
-            {currentWeek}/16
+            {currentWeek}/{TOTAL_WEEKS}
           </div>
         </div>
-        <p className="text-sm mt-2 opacity-80">
-          {t(`effort.${weekInfo.phase}`)}
-        </p>
       </div>
 
       {/* Weekly progress */}
@@ -130,11 +114,11 @@ export function Dashboard() {
           </span>
         </div>
         <div className="flex gap-1.5">
-          {lifts.map((lift) => (
+          {TRAINING_DAYS.map((day) => (
             <div
-              key={lift}
+              key={day}
               className={`flex-1 h-2 rounded-full ${
-                completedLifts.has(lift)
+                completedDays.has(day)
                   ? 'bg-green-500'
                   : 'bg-surface-200 dark:bg-surface-600'
               }`}
@@ -142,14 +126,14 @@ export function Dashboard() {
           ))}
         </div>
         <div className="flex gap-1.5 mt-1">
-          {lifts.map((lift) => (
-            <div key={lift} className="flex-1 text-center">
+          {TRAINING_DAYS.map((day) => (
+            <div key={day} className="flex-1 text-center">
               <span className={`text-xs ${
-                completedLifts.has(lift)
+                completedDays.has(day)
                   ? 'text-green-600 dark:text-green-400'
                   : 'text-surface-400 dark:text-surface-500'
               }`}>
-                {t(`lifts.${lift}`).slice(0, 3)}
+                {t(`dayTypes.${day}`).slice(0, 4)}
               </span>
             </div>
           ))}
@@ -161,22 +145,19 @@ export function Dashboard() {
 
       <h2 className="text-lg font-semibold mt-2">{t('workout.title')}</h2>
 
-      {lifts.map((lift) => {
-        const prescription = getWorkoutPrescription(
-          weekInfo.wave,
-          weekInfo.phase,
-          lift,
-          cycle.trainingMaxes[lift],
-          variant,
-        )
-        const mainSet = prescription.sets.find(s => !s.isWarmup) ?? prescription.sets[0]
-        const weight = getWeightForSet(cycle.trainingMaxes[lift], mainSet.percentage)
-        const isDone = completedLifts.has(lift)
+      {/* Training day cards */}
+      {TRAINING_DAYS.map((dayType) => {
+        const prescription = getDayPrescription(currentWeek, dayType, cycle.workingWeights)
+        const isDone = completedDays.has(dayType)
+        const firstExercise = prescription.exercises[0]
+        const weight = firstExercise
+          ? getExerciseWeight(firstExercise.exerciseId, dayType, currentWeek, cycle.workingWeights)
+          : 0
 
         return (
           <Card
-            key={lift}
-            onClick={() => navigate(`/workout/${lift}`)}
+            key={dayType}
+            onClick={() => navigate(`/workout/${dayType}`)}
             className={`flex items-center justify-between ${isDone ? 'opacity-60' : ''}`}
           >
             <div className="flex items-center gap-3">
@@ -190,11 +171,13 @@ export function Dashboard() {
                 <div className="w-6 h-6 rounded-full border-2 border-surface-300 dark:border-surface-500 flex-shrink-0" />
               )}
               <div>
-                <div className="font-semibold">{t(`lifts.${lift}`)}</div>
+                <div className="font-semibold">{t(`dayTypes.${dayType}Short`)}</div>
                 <div className="text-sm text-surface-500 dark:text-surface-400">
-                  {mainSet.reps === 'amrap'
-                    ? `${weight} ${t('common.kg')} × AMRAP`
-                    : `${weight} ${t('common.kg')} × ${mainSet.reps}`}
+                  {prescription.exercises.length} {t('workout.title').toLowerCase()} &middot;{' '}
+                  {firstExercise && !firstExercise.isAmrap
+                    ? `${firstExercise.sets}×${firstExercise.repsMin}-${firstExercise.repsMax}`
+                    : 'AMRAP'}
+                  {weight > 0 ? ` @ ${weight} ${t('common.kg')}` : ''}
                 </div>
               </div>
             </div>
@@ -205,51 +188,7 @@ export function Dashboard() {
         )
       })}
 
-      {/* Tabata conditioning card */}
-      {tabataEnabled && weekInfo && (() => {
-        const tabataWorkout = getTabataWorkout(weekInfo.wave, weekInfo.phase, currentWeek, tabataEquipment)
-        const freq = getTabataFrequency(weekInfo.phase)
-        const blockMin = Math.ceil(getBlockDurationSeconds(tabataWorkout.blocks[0]) / 60)
-        const isDone = !!tabataLog
-
-        return (
-          <>
-            <h2 className="text-lg font-semibold mt-4">{t('tabata.title')}</h2>
-            <Card
-              onClick={() => navigate('/workout/tabata')}
-              className={`flex items-center justify-between ${isDone ? 'opacity-60' : ''}`}
-            >
-              <div className="flex items-center gap-3">
-                {isDone ? (
-                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                ) : (
-                  <div className="w-6 h-6 rounded-full border-2 border-orange-400 dark:border-orange-500 flex-shrink-0" />
-                )}
-                <div>
-                  <div className="font-semibold">
-                    {tabataWorkout.blocks.length} {tabataWorkout.blocks.length === 1 ? 'block' : 'blocks'} &middot; ~{blockMin} {t('tabata.min')}
-                  </div>
-                  <div className="text-sm text-surface-500 dark:text-surface-400">
-                    {tabataWorkout.blocks.map((b) => t(`tabata.exercises.${b.exerciseId}`)).join(', ')}
-                  </div>
-                  <div className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
-                    {t('tabata.frequency', { min: freq.min, max: freq.max })}
-                  </div>
-                </div>
-              </div>
-              <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </Card>
-          </>
-        )
-      })()}
-
-      {/* Weekly AI summary — shows when all lifts are done and LLM configured */}
+      {/* Weekly AI summary */}
       {completedCount === totalCount && llmProvider && llmApiKey && (
         <Card className="bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-700/50 mt-2">
           <h3 className="text-sm font-semibold text-indigo-800 dark:text-indigo-300 mb-2">
@@ -269,14 +208,12 @@ export function Dashboard() {
                 setSummaryLoading(true)
                 try {
                   const result = await generateWeeklySummary({
-                    wave: weekInfo.wave,
-                    phase: weekInfo.phase,
                     week: currentWeek,
+                    block,
+                    dayType: 'hypertrophy',
                     logs: weekLogs ?? [],
-                    trainingMaxes: cycle.trainingMaxes,
+                    workingWeights: cycle.workingWeights,
                     cycle,
-                    amrapResults: amrapResults ?? [],
-                    tabataLogs: allTabataLogs ?? [],
                     provider: llmProvider,
                     apiKey: llmApiKey,
                     model: llmModel,
@@ -285,7 +222,7 @@ export function Dashboard() {
                   })
                   setWeekSummary(result)
                 } catch {
-                  // Non-critical, silently fail
+                  // Non-critical
                 } finally {
                   setSummaryLoading(false)
                 }
@@ -300,13 +237,14 @@ export function Dashboard() {
       {/* Training tips */}
       <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50 mt-2">
         <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
-          {t(`dashboard.tips.${weekInfo.phase}Title`)}
+          {t(`dashboard.tips.${tipKey}Title`)}
         </h3>
         <p className="text-sm text-amber-700 dark:text-amber-400">
-          {t(`dashboard.tips.${weekInfo.phase}`)}
+          {t(`dashboard.tips.${tipKey}`)}
         </p>
       </Card>
 
+      {/* Cycle complete */}
       {currentWeek === TOTAL_WEEKS && completedCount === totalCount && (
         <Card className="bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 mt-2">
           <h3 className="text-lg font-bold text-green-800 dark:text-green-300 mb-1">

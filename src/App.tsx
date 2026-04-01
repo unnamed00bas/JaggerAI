@@ -17,7 +17,7 @@ export function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/cycle/new" element={<CycleSetup />} />
         <Route path="/cycle/overview" element={<CycleOverview />} />
-        <Route path="/workout/:lift" element={<WorkoutDay />} />
+        <Route path="/workout/:dayType" element={<WorkoutDay />} />
         <Route path="/workout/tabata" element={<TabataDay />} />
         <Route path="/workout" element={<WorkoutList />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
