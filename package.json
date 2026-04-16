@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "type-check": "tsc -b --noEmit"
+    "type-check": "tsc -b --noEmit",
+    "gen:icons": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
     "dexie": "^4.3.0",

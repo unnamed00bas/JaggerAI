@@ -14,6 +14,7 @@ export {
   suggestNextWeight,
   targetWeightForPhase,
   missedDaysAdjustment,
+  computeTmsFromHistory,
 } from './progression'
 export {
   nextDayType,

@@ -1,6 +1,8 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { BottomNav } from './BottomNav'
 import { useTheme } from '../../hooks/useTheme'
+import { ToastHost } from '../ui/Toast'
+import { ConfirmDialogHost } from '../ui/ConfirmDialog'
 
 export function AppShell() {
   useTheme()
@@ -10,6 +12,8 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-surface-950 text-surface-50">
+      <ToastHost />
+      <ConfirmDialogHost />
       <main className="max-w-lg mx-auto px-4 pt-4 pb-24 safe-top">
         <Outlet />
       </main>

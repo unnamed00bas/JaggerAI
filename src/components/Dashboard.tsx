@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
+import { Skeleton, SkeletonCard } from './ui/Skeleton'
+import { EmptyState } from './ui/EmptyState'
 import { useProfileStore } from '../stores/profileStore'
 import { useWorkoutStore } from '../stores/workoutStore'
 import { db } from '../lib/db'
@@ -27,24 +29,45 @@ export function Dashboard() {
 
   const phase = phaseForWeek(cycle.currentWeek)
 
-  const weekLogs =
-    useLiveQuery(async () => {
-      const since = startOfWeek(new Date()).toISOString()
-      return db.workouts.where('date').aboveOrEqual(since).toArray()
-    }, []) ?? []
+  const weekLogs = useLiveQuery(async () => {
+    const since = startOfWeek(new Date()).toISOString()
+    return db.workouts.where('date').aboveOrEqual(since).toArray()
+  }, [])
 
-  const allLogs =
-    useLiveQuery(async () => {
-      return (await db.workouts.orderBy('date').reverse().limit(50).toArray()) ?? []
-    }, []) ?? []
+  const allLogs = useLiveQuery(
+    async () => (await db.workouts.orderBy('date').reverse().limit(50).toArray()) ?? [],
+    [],
+  )
 
   const lastRowing = useLiveQuery(async () => {
     return db.rowingSessions.orderBy('date').reverse().first()
   }, [])
 
-  const doneThisWeek = workoutsCompletedThisWeek(weekLogs)
-  const streak = computeStreak(allLogs)
-  const todayDay = active?.dayType ?? nextDayType(weekLogs)
+  const loadingDb = weekLogs === undefined || allLogs === undefined
+
+  if (loadingDb) {
+    return (
+      <div className="flex flex-col gap-4 pb-4">
+        <header className="pt-2">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-56 mt-2" />
+        </header>
+        <SkeletonCard />
+        <div className="grid grid-cols-2 gap-3">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+        <SkeletonCard />
+      </div>
+    )
+  }
+
+  const safeWeekLogs = weekLogs ?? []
+  const safeAllLogs = allLogs ?? []
+  const doneThisWeek = workoutsCompletedThisWeek(safeWeekLogs)
+  const streak = computeStreak(safeAllLogs)
+  const todayDay = active?.dayType ?? nextDayType(safeWeekLogs)
+  const isFirstRun = safeAllLogs.length === 0 && !active
   const todayColors = DAY_COLORS[todayDay]
   const protocol = getProtocolForDay(todayDay, phase)
   const activePhase = phase === 'deload' ? null : (phase as 1 | 2 | 3 | 4)
@@ -69,6 +92,23 @@ export function Dashboard() {
           {t('dashboard.current_phase', { phase: t(PHASE_NAME_KEYS[phase]) })}
         </p>
       </header>
+
+      {isFirstRun && (
+        <EmptyState
+          title={t('onboarding.welcome_title')}
+          description={t('onboarding.welcome_text')}
+          action={
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => navigate('/settings')}>
+                {t('onboarding.go_settings')}
+              </Button>
+              <Button size="sm" onClick={startOrContinue}>
+                {t('onboarding.first_workout')}
+              </Button>
+            </div>
+          }
+        />
+      )}
 
       <Card className={`${todayColors.bg} border ${todayColors.border}`}>
         <div className="flex items-center justify-between mb-2">
@@ -109,7 +149,7 @@ export function Dashboard() {
           </div>
           <div className="mt-2 flex gap-1">
             {(['A', 'B', 'D', 'C'] as const).map((d) => {
-              const done = weekLogs.some((w) => w.dayType === d && w.completed)
+              const done = safeWeekLogs.some((w) => w.dayType === d && w.completed)
               const color = DAY_COLORS[d]
               return (
                 <div
