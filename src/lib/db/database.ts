@@ -1,37 +1,37 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { CycleConfig, WorkoutLog, AmrapResult, TabataLog } from '../../types'
+import type {
+  WorkoutLog,
+  RowingSession,
+  PersonalRecord,
+} from '../../types'
 
-export class JaggerDatabase extends Dexie {
-  cycles!: EntityTable<CycleConfig, 'id'>
-  workoutLogs!: EntityTable<WorkoutLog, 'id'>
-  amrapResults!: EntityTable<AmrapResult, 'id'>
-  tabataLogs!: EntityTable<TabataLog, 'id'>
+export class RowFitDatabase extends Dexie {
+  workouts!: EntityTable<WorkoutLog, 'id'>
+  rowingSessions!: EntityTable<RowingSession, 'id'>
+  personalRecords!: EntityTable<PersonalRecord, 'id'>
 
   constructor() {
-    super('JaggerAI')
+    super('RowFitDB')
 
-    // v5: Removed sync-related _dirty index, local-only storage
-    this.version(5).stores({
-      cycles: 'id, createdAt, updatedAt',
-      workoutLogs: 'id, cycleId, [cycleId+dayType+week], date, updatedAt',
-      amrapResults: 'id, cycleId, [cycleId+exerciseId], date, updatedAt',
-      tabataLogs: 'id, date, updatedAt',
+    this.version(1).stores({
+      workouts: 'id, cycleId, dayType, phase, week, date, completed, updatedAt',
+      rowingSessions: 'id, workoutId, protocolId, date, updatedAt',
+      personalRecords: 'id, exerciseId, date, updatedAt',
     })
   }
 }
 
-export const db = new JaggerDatabase()
+export const db = new RowFitDatabase()
 
 /**
- * Try to open the database. If it fails (e.g. corrupted data, schema mismatch),
- * delete the database and create a fresh one.
+ * Open DB. If it fails, reset and recreate. Local-only data.
  */
 export async function initDatabase(): Promise<void> {
   try {
     await db.open()
   } catch {
     console.warn('Database failed to open, resetting to fresh state...')
-    await Dexie.delete('JaggerAI')
+    await Dexie.delete('RowFitDB')
     await db.open()
   }
 }

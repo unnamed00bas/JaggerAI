@@ -1,162 +1,254 @@
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { useCycleStore } from '../../stores/cycleStore'
-import { db } from '../../lib/db'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  CartesianGrid,
+} from 'recharts'
 import { Card } from '../ui/Card'
-import type { AmrapResult, WorkoutLog, CompletedSet } from '../../types'
-import { MAIN_LIFTS } from '../../types'
-
-const EXERCISE_COLORS: Record<string, string> = {
-  squat: '#ef4444',
-  bench: '#3b82f6',
-  ohp: '#f59e0b',
-  deadlift: '#10b981',
-  barbell_row: '#8b5cf6',
-}
+import { db } from '../../lib/db'
+import { EXERCISES } from '../../lib/exercises'
+import { parseSplit } from '../../lib/rowing'
+import { computeStreak } from '../../lib/program'
 
 export function AnalyticsPage() {
   const { t } = useTranslation()
-  const activeCycleId = useCycleStore((s) => s.activeCycleId)
 
-  const amrapResults = useLiveQuery(
-    () => (activeCycleId
-      ? db.amrapResults.where('cycleId').equals(activeCycleId).sortBy('date')
-      : Promise.resolve([] as AmrapResult[])),
-    [activeCycleId],
-  )
+  const workouts = useLiveQuery(async () => {
+    return (await db.workouts.orderBy('date').toArray()) ?? []
+  }, []) ?? []
 
-  const workoutLogs = useLiveQuery(
-    () => (activeCycleId
-      ? db.workoutLogs.where('cycleId').equals(activeCycleId).sortBy('date')
-      : Promise.resolve([] as WorkoutLog[])),
-    [activeCycleId],
-  )
+  const rowings = useLiveQuery(async () => {
+    return (await db.rowingSessions.orderBy('date').toArray()) ?? []
+  }, []) ?? []
 
-  if (!workoutLogs?.length && !amrapResults?.length) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="text-5xl">📊</div>
-        <h1 className="text-xl font-bold">{t('analytics.title')}</h1>
-        <p className="text-surface-500 dark:text-surface-400 text-center">
-          {t('analytics.noData')}
-        </p>
-      </div>
-    )
-  }
+  const prs = useLiveQuery(async () => {
+    return (await db.personalRecords.orderBy('updatedAt').reverse().toArray()) ?? []
+  }, []) ?? []
 
-  // Weight progression: track max actual weight used per exercise per week
-  const weightByWeek = (workoutLogs ?? []).reduce<Record<number, Record<string, number>>>((acc, log) => {
-    if (!acc[log.week]) acc[log.week] = {}
-    for (const exercise of log.exercises) {
-      if (!MAIN_LIFTS.includes(exercise.exerciseId as typeof MAIN_LIFTS[number])) continue
-      const maxWeight = exercise.sets.reduce((max: number, s: CompletedSet) =>
-        s.completed && s.actualWeight > max ? s.actualWeight : max, 0)
-      if (maxWeight > (acc[log.week][exercise.exerciseId] ?? 0)) {
-        acc[log.week][exercise.exerciseId] = maxWeight
+  const exerciseIds = useMemo(() => {
+    const s = new Set<string>()
+    workouts.forEach((w) => w.exercises.forEach((e) => s.add(e.exerciseId)))
+    return Array.from(s)
+  }, [workouts])
+
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null)
+  const chosenExerciseId = selectedExerciseId ?? exerciseIds[0] ?? null
+
+  const exerciseData = useMemo(() => {
+    if (!chosenExerciseId) return []
+    return workouts
+      .filter((w) => w.exercises.some((e) => e.exerciseId === chosenExerciseId))
+      .map((w) => {
+        const ex = w.exercises.find((e) => e.exerciseId === chosenExerciseId)!
+        const top = ex.sets.reduce<number>(
+          (m, s) => Math.max(m, s.actualWeightKg ?? 0),
+          0,
+        )
+        return { date: w.date.slice(5, 10), weight: top }
+      })
+      .filter((p) => p.weight > 0)
+  }, [workouts, chosenExerciseId])
+
+  const rowingPaceData = useMemo(() => {
+    return rowings
+      .map((r) => {
+        const sec = parseSplit(r.avgSplit)
+        if (sec == null) return null
+        return { date: r.date.slice(5, 10), splitSec: sec, label: r.avgSplit }
+      })
+      .filter((p): p is { date: string; splitSec: number; label: string } => p != null)
+  }, [rowings])
+
+  const rowingPowerData = useMemo(() => {
+    return rowings
+      .filter((r) => r.avgPower > 0)
+      .map((r) => ({ date: r.date.slice(5, 10), power: r.avgPower }))
+  }, [rowings])
+
+  const weeklyTonnage = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const w of workouts) {
+      if (!w.completed) continue
+      const weekKey = w.week
+      let tonnage = 0
+      for (const e of w.exercises) {
+        for (const s of e.sets) {
+          if (s.actualWeightKg && s.actualReps)
+            tonnage += s.actualWeightKg * s.actualReps
+        }
       }
+      map.set(weekKey, (map.get(weekKey) ?? 0) + tonnage)
     }
-    return acc
-  }, {})
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([week, tonnage]) => ({ week: `W${week}`, tonnage: Math.round(tonnage) }))
+  }, [workouts])
 
-  const weightChartData = Object.entries(weightByWeek)
-    .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([week, exercises]) => ({
-      week: `W${week}`,
-      ...exercises,
-    }))
-
-  // Volume (tonnage) by week
-  const volumeByWeek = (workoutLogs ?? []).reduce<Record<number, Record<string, number>>>((acc, log) => {
-    if (!acc[log.week]) acc[log.week] = {}
-    for (const exercise of log.exercises) {
-      const tonnage = exercise.sets.reduce((sum: number, s: CompletedSet) =>
-        sum + (s.completed ? s.actualWeight * s.actualReps : 0), 0)
-      const key = log.dayType
-      acc[log.week][key] = (acc[log.week][key] ?? 0) + tonnage
-    }
-    return acc
-  }, {})
-
-  const volumeChartData = Object.entries(volumeByWeek)
-    .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([week, days]) => ({
-      week: `W${week}`,
-      ...days,
-    }))
-
-  // AMRAP test results
-  const amrapChartData = (amrapResults ?? []).map((r) => ({
-    label: `${t(`exercises.short.${r.exerciseId}`)}`,
-    reps: r.actualReps,
-    weight: r.weight,
-    e1rm: r.estimatedOneRepMax,
-  }))
+  const streak = computeStreak(workouts)
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-bold">{t('analytics.title')}</h1>
+    <div className="flex flex-col gap-4 pb-4">
+      <header>
+        <h1 className="text-2xl font-bold">{t('analytics.title')}</h1>
+      </header>
 
-      {weightChartData.length > 0 && (
+      <div className="grid grid-cols-2 gap-3">
         <Card>
-          <h2 className="text-sm font-semibold mb-3">{t('analytics.weightProgress')}</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={weightChartData}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} domain={['dataMin - 5', 'dataMax + 5']} />
-              <Tooltip />
-              {MAIN_LIFTS.map((lift) => (
-                <Line
-                  key={lift}
-                  type="monotone"
-                  dataKey={lift}
-                  stroke={EXERCISE_COLORS[lift]}
-                  strokeWidth={2}
-                  name={t(`exercises.short.${lift}`)}
-                  dot={{ r: 4 }}
-                  connectNulls
-                />
-              ))}
-              <Legend />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="text-xs text-surface-400">{t('analytics.current_streak')}</div>
+          <div className="mt-2 text-3xl font-bold text-[color:var(--color-accent-500)]">{streak}</div>
         </Card>
-      )}
-
-      {volumeChartData.length > 0 && (
         <Card>
-          <h2 className="text-sm font-semibold mb-3">{t('analytics.volumeByWeek')}</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={volumeChartData}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Bar dataKey="hypertrophy" fill="#3b82f6" name={t('dayTypes.hypertrophy')} stackId="vol" />
-              <Bar dataKey="volume" fill="#f59e0b" name={t('dayTypes.volume')} stackId="vol" />
-              <Bar dataKey="strength" fill="#ef4444" name={t('dayTypes.strength')} stackId="vol" />
-              <Legend />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="text-xs text-surface-400">{t('analytics.personal_records')}</div>
+          <div className="mt-2 text-3xl font-bold text-[color:var(--color-accent-500)]">{prs.length}</div>
         </Card>
-      )}
+      </div>
 
-      {amrapChartData.length > 0 && (
+      {workouts.length === 0 && rowings.length === 0 ? (
         <Card>
-          <h2 className="text-sm font-semibold mb-3">{t('analytics.amrapResults')}</h2>
-          <div className="space-y-2">
-            {amrapChartData.map((r, i) => (
-              <div key={i} className="flex items-center justify-between p-2 bg-surface-50 dark:bg-surface-800 rounded-lg">
-                <span className="font-medium text-sm">{r.label}</span>
-                <div className="text-right">
-                  <span className="text-sm font-bold">{r.reps} reps @ {r.weight} kg</span>
-                  <span className="text-xs text-surface-500 ml-2">e1RM: {r.e1rm} kg</span>
-                </div>
+          <p className="text-sm text-surface-400 text-center py-4">{t('analytics.no_data')}</p>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold">{t('analytics.exercise_weight')}</h2>
+              <select
+                value={chosenExerciseId ?? ''}
+                onChange={(e) => setSelectedExerciseId(e.target.value)}
+                className="text-xs bg-surface-800 border border-surface-700 rounded px-2 py-1 text-surface-200"
+              >
+                {exerciseIds.map((id) => (
+                  <option key={id} value={id}>
+                    {EXERCISES[id]?.name ?? id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="h-48">
+              {exerciseData.length > 0 ? (
+                <ResponsiveContainer>
+                  <LineChart data={exerciseData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip
+                      contentStyle={{ background: '#1e293b', border: '1px solid #334155' }}
+                      labelStyle={{ color: '#cbd5e1' }}
+                    />
+                    <Line type="monotone" dataKey="weight" stroke="#f07a4a" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-xs text-surface-500 text-center py-6">{t('analytics.no_data')}</p>
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="text-sm font-semibold mb-2">{t('analytics.rowing_pace')}</h2>
+            <div className="h-40">
+              {rowingPaceData.length > 0 ? (
+                <ResponsiveContainer>
+                  <LineChart data={rowingPaceData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
+                    <YAxis
+                      stroke="#94a3b8"
+                      fontSize={11}
+                      reversed
+                      domain={['auto', 'auto']}
+                      tickFormatter={(s) =>
+                        `${Math.floor(s / 60)}:${(Math.floor(s) % 60).toString().padStart(2, '0')}`
+                      }
+                    />
+                    <Tooltip
+                      contentStyle={{ background: '#1e293b', border: '1px solid #334155' }}
+                      labelStyle={{ color: '#cbd5e1' }}
+                      formatter={(_, __, p) => [p.payload.label ?? '-', 'темп']}
+                    />
+                    <Line type="monotone" dataKey="splitSec" stroke="#4af0c4" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-xs text-surface-500 text-center py-6">{t('analytics.no_data')}</p>
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="text-sm font-semibold mb-2">{t('analytics.rowing_power')}</h2>
+            <div className="h-40">
+              {rowingPowerData.length > 0 ? (
+                <ResponsiveContainer>
+                  <LineChart data={rowingPowerData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip
+                      contentStyle={{ background: '#1e293b', border: '1px solid #334155' }}
+                      labelStyle={{ color: '#cbd5e1' }}
+                    />
+                    <Line type="monotone" dataKey="power" stroke="#c8f135" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-xs text-surface-500 text-center py-6">{t('analytics.no_data')}</p>
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="text-sm font-semibold mb-2">{t('analytics.weekly_tonnage')}</h2>
+            <div className="h-40">
+              {weeklyTonnage.length > 0 ? (
+                <ResponsiveContainer>
+                  <BarChart data={weeklyTonnage}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="week" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip
+                      contentStyle={{ background: '#1e293b', border: '1px solid #334155' }}
+                      labelStyle={{ color: '#cbd5e1' }}
+                    />
+                    <Bar dataKey="tonnage" fill="#f07a4a" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-xs text-surface-500 text-center py-6">{t('analytics.no_data')}</p>
+              )}
+            </div>
+          </Card>
+
+          {prs.length > 0 && (
+            <Card>
+              <h2 className="text-sm font-semibold mb-2">{t('analytics.personal_records')}</h2>
+              <div className="flex flex-col gap-1.5">
+                {prs.slice(0, 10).map((pr) => (
+                  <div key={pr.id} className="flex items-center justify-between text-xs">
+                    <span className="text-surface-300">
+                      {EXERCISES[pr.exerciseId]?.name ?? pr.exerciseId}
+                    </span>
+                    <span className="tabular-nums text-surface-200">
+                      {pr.weightKg != null && pr.reps != null
+                        ? `${pr.weightKg}×${pr.reps} (1RM ${pr.estOneRepMax} кг)`
+                        : pr.bestSplit
+                        ? `${pr.bestSplit}/500м`
+                        : '—'}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </Card>
+            </Card>
+          )}
+        </>
       )}
     </div>
   )

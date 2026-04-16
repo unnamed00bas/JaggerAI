@@ -9,7 +9,6 @@ export interface ChatMessage {
 
 interface CoachChatState {
   messages: ChatMessage[]
-  /** Optional prompt to auto-send when CoachPage opens */
   pendingPrompt: string | null
 
   addMessage: (msg: Omit<ChatMessage, 'timestamp'>) => void
@@ -33,7 +32,7 @@ export const useCoachChatStore = create<CoachChatState>()(
       clearHistory: () => set({ messages: [], pendingPrompt: null }),
     }),
     {
-      name: 'jagger-coach-chat',
+      name: 'rowfit-coach-chat',
       partialize: (state) => ({ messages: state.messages }),
     },
   ),

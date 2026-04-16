@@ -1,1 +1,1 @@
-export { db, JaggerDatabase, initDatabase } from './database'
+export { db, RowFitDatabase, initDatabase } from './database'

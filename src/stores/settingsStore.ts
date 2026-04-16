@@ -1,24 +1,25 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { TabataEquipment } from '../types'
+
+export type Theme = 'system' | 'light' | 'dark'
+export type Language = 'ru' | 'en'
+export type LlmProviderName = 'claude' | 'openai' | 'glm' | null
 
 interface SettingsState {
-  theme: 'system' | 'light' | 'dark'
-  language: 'ru' | 'en'
-  defaultRestTimerSeconds: number
-  tabataEnabled: boolean
-  tabataEquipment: TabataEquipment
-  llmProvider: 'claude' | 'openai' | 'glm' | null
+  theme: Theme
+  language: Language
+  defaultRestTimerSec: number
+  notificationsEnabled: boolean
+  llmProvider: LlmProviderName
   llmApiKey: string
   llmModel: string
   llmBaseUrl: string
 
-  setTheme: (theme: 'system' | 'light' | 'dark') => void
-  setLanguage: (language: 'ru' | 'en') => void
-  setDefaultRestTimerSeconds: (seconds: number) => void
-  setTabataEnabled: (enabled: boolean) => void
-  setTabataEquipment: (equipment: TabataEquipment) => void
-  setLlmProvider: (provider: 'claude' | 'openai' | 'glm' | null) => void
+  setTheme: (theme: Theme) => void
+  setLanguage: (language: Language) => void
+  setDefaultRestTimerSec: (seconds: number) => void
+  setNotificationsEnabled: (on: boolean) => void
+  setLlmProvider: (provider: LlmProviderName) => void
   setLlmApiKey: (key: string) => void
   setLlmModel: (model: string) => void
   setLlmBaseUrl: (url: string) => void
@@ -27,11 +28,10 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      theme: 'system',
+      theme: 'dark',
       language: 'ru',
-      defaultRestTimerSeconds: 120,
-      tabataEnabled: false,
-      tabataEquipment: 'mixed',
+      defaultRestTimerSec: 120,
+      notificationsEnabled: false,
       llmProvider: null,
       llmApiKey: '',
       llmModel: '',
@@ -39,14 +39,13 @@ export const useSettingsStore = create<SettingsState>()(
 
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
-      setDefaultRestTimerSeconds: (seconds) => set({ defaultRestTimerSeconds: seconds }),
-      setTabataEnabled: (enabled) => set({ tabataEnabled: enabled }),
-      setTabataEquipment: (equipment) => set({ tabataEquipment: equipment }),
-      setLlmProvider: (provider) => set({ llmProvider: provider }),
-      setLlmApiKey: (key) => set({ llmApiKey: key }),
-      setLlmModel: (model) => set({ llmModel: model }),
-      setLlmBaseUrl: (url) => set({ llmBaseUrl: url }),
+      setDefaultRestTimerSec: (seconds) => set({ defaultRestTimerSec: seconds }),
+      setNotificationsEnabled: (on) => set({ notificationsEnabled: on }),
+      setLlmProvider: (llmProvider) => set({ llmProvider }),
+      setLlmApiKey: (llmApiKey) => set({ llmApiKey }),
+      setLlmModel: (llmModel) => set({ llmModel }),
+      setLlmBaseUrl: (llmBaseUrl) => set({ llmBaseUrl }),
     }),
-    { name: 'jagger-settings' },
+    { name: 'rowfit-settings' },
   ),
 )

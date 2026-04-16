@@ -1,264 +1,149 @@
-import type { CycleConfig, AmrapResult, WorkoutLog, TabataLog, WorkoutType } from '../../types'
-import { MAIN_LIFTS, workingWeightKey } from '../../types'
-import { getBlock } from '../juggernaut'
-import { buildCatalogSummary } from '../workouts'
+import type {
+  UserProfile,
+  CycleState,
+  Phase,
+  WorkoutLog,
+  PersonalRecord,
+  RowingSession,
+  DayType,
+} from '../../types'
+import { phaseForWeek } from '../program'
 
 interface CoachContext {
-  cycle?: CycleConfig
-  amrapResults?: AmrapResult[]
-  workoutLogs?: WorkoutLog[]
-  tabataLogs?: TabataLog[]
-  language: 'ru' | 'en'
-  currentWeek?: number
+  profile: UserProfile
+  cycle: CycleState
+  recentWorkouts: WorkoutLog[]
+  personalRecords: PersonalRecord[]
+  lastRowing?: RowingSession
+  todayDayType?: DayType
+  skippedDays?: number
+  language?: 'ru' | 'en'
+}
+
+function phaseName(phase: Phase): string {
+  switch (phase) {
+    case 1: return 'Фаза 1 — Адаптация'
+    case 2: return 'Фаза 2 — Объём'
+    case 3: return 'Фаза 3 — Интенсивность'
+    case 4: return 'Фаза 4 — Пик'
+    case 'deload': return 'Разгрузка'
+  }
+}
+
+function summarizeLastWorkout(w: WorkoutLog | undefined): string {
+  if (!w) return 'нет данных'
+  const ex = w.exercises
+    .map((e) => {
+      const best = e.sets.find((s) => s.actualWeightKg != null) ?? e.sets[0]
+      if (!best) return `${e.exerciseId}`
+      const wkg = best.actualWeightKg != null ? `${best.actualWeightKg} кг` : ''
+      const reps = best.actualReps != null ? `×${best.actualReps}` : ''
+      return `${e.exerciseId} ${wkg}${reps}`
+    })
+    .join(', ')
+  return `День ${w.dayType}, ${w.date.slice(0, 10)}: ${ex || '—'}`
+}
+
+function summarizeWeights(cycle: CycleState): string {
+  const entries = Object.entries(cycle.workingWeightsKg)
+  if (entries.length === 0) return 'не заданы (используются табличные)'
+  return entries.map(([id, kg]) => `${id}: ${kg} кг`).join(', ')
+}
+
+function summarizePrs(prs: PersonalRecord[]): string {
+  if (prs.length === 0) return 'пока нет'
+  return prs
+    .slice(0, 8)
+    .map((p) => {
+      if (p.weightKg != null && p.reps != null) return `${p.exerciseId}: ${p.weightKg}×${p.reps}`
+      if (p.bestSplit) return `${p.exerciseId}: ${p.bestSplit}`
+      return p.exerciseId
+    })
+    .join(', ')
+}
+
+function summarizeRowing(r: RowingSession | undefined): string {
+  if (!r) return 'нет данных'
+  return `${r.distanceM} м, средний темп ${r.avgSplit}/500м, мощность ${r.avgPower} Вт (макс ${r.maxPower}), SPM ${r.avgSpm}`
 }
 
 export function buildCoachSystemPrompt(ctx: CoachContext): string {
-  const lang = ctx.language === 'ru' ? 'Russian' : 'English'
-  const sections: string[] = []
+  const phase = phaseForWeek(ctx.cycle.currentWeek)
+  const lastWorkout = ctx.recentWorkouts[0]
+  const lang = ctx.language === 'en' ? 'English' : 'Russian'
+  return `Ты — персональный тренер и фитнес-ассистент конкретного пользователя. Отвечай на языке: ${lang}.
 
-  sections.push(`<role>
-You are an elite strength & conditioning coach specializing in undulating periodization programs.
-You combine deep programming knowledge with practical coaching experience.
-Your communication style is direct, encouraging, and evidence-based.
-Always respond in ${lang}.
-</role>`)
+ПРОФИЛЬ:
+Имя: ${ctx.profile.name}
+Возраст: ${ctx.profile.age}, рост ${ctx.profile.heightCm} см, вес ${ctx.profile.weightKg} кг
+Опыт: ${ctx.profile.experience}
+Цель: ${ctx.profile.goal}
+Оборудование: ${ctx.profile.equipment}
+График: ${ctx.profile.sessionsPerWeek}×${ctx.profile.sessionDurationMin} мин/нед
 
-  sections.push(`<domain_knowledge>
-## 3-Day Undulating Periodization Program
+ТЕКУЩИЙ СТАТУС:
+Неделя: ${ctx.cycle.currentWeek}/16 — ${phaseName(phase)}
+Завершённых циклов: ${ctx.cycle.completedCycles}
+Сегодня планируется: День ${ctx.todayDayType ?? 'не задан'}
+Последняя тренировка: ${summarizeLastWorkout(lastWorkout)}
+Рабочие веса: ${summarizeWeights(ctx.cycle)}
+Личные рекорды: ${summarizePrs(ctx.personalRecords)}
+Последняя гребля: ${summarizeRowing(ctx.lastRowing)}
+Пропущено дней: ${ctx.skippedDays ?? 0}
 
-**Schedule:** Mon (Hypertrophy 6-8 reps) — Wed (Volume 10-12 reps) — Fri (Strength 3-5 reps)
-**Cycle:** 12 weeks, 3 blocks of 4 weeks each.
+ПРОГРАММА (16 недель, 4 фазы × 4 недели):
+• Фаза 1 (1–4):  Адаптация    — 3×5 / 3×10 / 3×12
+• Фаза 2 (5–8):  Объём        — 4×5 / 4×10
+• Фаза 3 (9–12): Интенсивность — 5×3, снижение объёма
+• Фаза 4 (13–15): Пик          — 3×3, пиковые веса
+• Неделя 16:     Разгрузка     — 50–60% от рабочих
 
-### Block 1: Adaptation (Weeks 1-4)
-- Goal: Master technique, establish working weights.
-- W1-2: 3 sets main exercises. W3: 4 sets. W4: Deload (2 sets, 50-60% weight).
-- Progression: +2.5 kg upper body, +5 kg lower body per 1-2 sessions.
+Недельная структура: A (Pull, тяжёлый) → B (Lower, тяжёлый) → C (Push, тяжёлый) → D (Recovery).
+Правило: между тяжёлыми днями минимум 1 день отдыха; D не перед B/C.
 
-### Block 2: Hypertrophy & Volume (Weeks 5-8)
-- Goal: Maximize training volume for muscle growth.
-- W5-6: 4 sets, slightly lower rep targets. W7: 5 sets, peak volume. W8: Deload.
-- Can substitute 1-2 exercises on volume day for variety.
+ПРАВИЛА ПРОГРЕССИИ:
+• Все подходы чисто → +2.5 кг
+• Последний подход с трудом → держать вес
+• Сорвал подход → −5%
+• Техника поплыла → −10%
+• Гравитрон: снижение облегчения по фазам (35→30→25→20 кг)
+• Брусья: +5 кг когда 3×10 даётся легко
 
-### Block 3: Strength & Peak (Weeks 9-12)
-- Goal: Peak strength, reduce volume, increase intensity.
-- W9-10: Heavier loads, lower reps. W11: Near-max intensity.
-- W12: AMRAP test at 90% of estimated 1RM — determines next cycle weights.
+ПРОТОКОЛЫ ГРЕБЛИ (Technogym):
+• День A: 5×15 rows / 1:00r (нейромышечная) или Splits 500м (тест, фаза 4)
+• День B: 15 min / 4:00 / 1:00r (аэробная) → Constant power / 3 Cadences (фазы 3–4)
+• День C: 12 min / 1:00 / 0:30r → 7 min / 0:30 / 0:30r (фазы 2–4)
+• День D: лёгкая гребля по необходимости
+Целевые темпы (мин/500м): Ф1 2:08–2:12, Ф2 2:03–2:08, Ф3 1:58–2:03, Ф4 <1:58
 
-### Day Structure
-**Day 1 (Mon — Hypertrophy):** Squat, Bench, Barbell Row, OHP, Romanian Deadlift, Curl, Tricep Pushdown, Plank
-**Day 2 (Wed — Volume):** Leg Press, Pull-ups, Incline DB Press, Cable Row, Bulgarian Split Squat, Lateral Raise, Leg Curl, Cable Crunch
-**Day 3 (Fri — Strength):** Squat, Deadlift, Bench, OHP, Barbell Row, Farmer's Walk
+ТВОЯ РОЛЬ:
+1. Отвечай на вопросы о тренировках, технике, восстановлении, питании.
+2. Анализируй данные гребли когда пользователь их присылает.
+3. Рекомендуй вес на следующую тренировку основываясь на истории.
+4. Объясняй технику упражнений пошагово, если просят.
+5. Корректируй план при пропусках — мягко, без осуждения.
+6. Отвечай на вопросы о прогрессе и сравнивай с предыдущими тренировками.
+7. Помогай с мотивацией и постановкой микроцелей.
 
-### Rest Times
-- Strength (3-5 reps): 3-5 min
-- Hypertrophy (6-8 reps): 2-3 min
-- Volume (10-12 reps): 60-90 sec
+ПРАВИЛА ОБЩЕНИЯ:
+• Пиши кратко и конкретно, как опытный тренер в зале.
+• Не используй сложные термины без объяснения.
+• Если пользователь говорит о боли — ВСЕГДА рекомендуй остановить тренировку и при необходимости обратиться к врачу.
+• Никогда не рекомендуй тренировки через острую боль.
+• Не льсти, давай честную обратную связь.
+• При пропусках — не осуждай, адаптируй план и помоги вернуться.
+• Используй данные из истории тренировок для конкретных рекомендаций.
 
-### Progression Rules
-- **"2 for 2" rule:** If athlete completes ALL sets at upper rep range on 2 consecutive sessions → increase weight.
-- **Double progression:** First increase reps to top of range, then increase weight and drop to bottom of range.
-- **Increments:** Upper body +2.5 kg, Lower body +5 kg, Dumbbells +1.25-2.5 kg.
+ПРИОРИТЕТ ЗНАНИЙ:
+1. Данные из базы пользователя (история, веса, прогресс) — всегда точнее.
+2. Программа тренировок (фазы, протоколы, прогрессия).
+3. Общие принципы силовых тренировок и физиологии.
+4. При противоречии — уточни у пользователя.
 
-### RPE Scale
-- RPE 6: 4+ reps in reserve (warmup)
-- RPE 7-8: 2-3 reps in reserve (main work)
-- RPE 9: 1 rep in reserve (top sets on strength day)
-- RPE 10: Absolute max (AMRAP tests only)
-
-### Deload Protocol (every 4 weeks)
-- Same exercises, 40-50% volume/weight reduction
-- No work to failure, focus on technique and mobility
-- Forward reload: next block starts at previous block's ending weights
-
-### Recovery
-- 48-72 hours between sessions for same muscle group
-- Sleep 7-9 hours, protein 1.6-2.2 g/kg/day
-- Active recovery on off days (walking, foam rolling)
-- If all sets feel RPE 9-10 for a full week → early deload
-
-### AMRAP Test (Week 12)
-- Test squat, bench, deadlift at 90% estimated 1RM
-- Use Epley formula: e1RM = weight × (1 + reps/30)
-- Results set new working weights for next cycle (+5-10% increase)
-
-### Nutrition Guidelines
-- Protein: 1.6-2.2 g/kg bodyweight daily
-- Surplus: +200-300 kcal/day for mass gain
-- Pre-workout: 30-60 g carbs, 60-90 min before
-- Post-workout: 20-40 g protein within 2 hours
-</domain_knowledge>`)
-
-  // Athlete data
-  const dataLines: string[] = []
-
-  if (ctx.cycle) {
-    const orm = ctx.cycle.oneRepMaxes
-    dataLines.push(`**1RM values:** Squat ${orm.squat} kg, Bench ${orm.bench} kg, OHP ${orm.ohp} kg, Deadlift ${orm.deadlift} kg`)
-
-    const ww = ctx.cycle.workingWeights
-    dataLines.push(`**Current working weights (Hypertrophy / Strength):**`)
-    for (const lift of MAIN_LIFTS) {
-      const h = ww[workingWeightKey(lift, 'hypertrophy')] ?? 0
-      const s = ww[workingWeightKey(lift, 'strength')] ?? 0
-      dataLines.push(`- ${lift}: ${h} kg / ${s} kg`)
-    }
-    dataLines.push(`**Cycle start:** ${ctx.cycle.startDate?.slice(0, 10) ?? 'unknown'}`)
-  }
-
-  if (ctx.currentWeek) {
-    const block = getBlock(ctx.currentWeek)
-    dataLines.push(`**Current position:** Week ${ctx.currentWeek}/12, Block ${block}`)
-  }
-
-  if (ctx.workoutLogs?.length) {
-    dataLines.push('')
-    dataLines.push('**Recent Workout Logs:**')
-    const recentLogs = ctx.workoutLogs.slice(-6)
-    for (const log of recentLogs) {
-      const exerciseSummaries = log.exercises.map(e => {
-        const completedSets = e.sets.filter(s => s.completed).length
-        const maxWeight = e.sets.reduce((max, s) => s.completed && s.actualWeight > max ? s.actualWeight : max, 0)
-        const avgRpe = e.sets.filter(s => s.rpe).reduce((sum, s) => sum + (s.rpe ?? 0), 0) / (e.sets.filter(s => s.rpe).length || 1)
-        return `${e.exerciseId}: ${completedSets}/${e.sets.length} sets, max ${maxWeight}kg${avgRpe > 0 ? `, RPE ${avgRpe.toFixed(1)}` : ''}`
-      }).join('; ')
-      const noteStr = log.notes ? ` — "${log.notes}"` : ''
-      dataLines.push(`- W${log.week} ${log.dayType}: ${exerciseSummaries}${noteStr}`)
-    }
-  }
-
-  if (ctx.amrapResults?.length) {
-    dataLines.push('')
-    dataLines.push('**AMRAP Test Results:**')
-    for (const r of ctx.amrapResults) {
-      dataLines.push(`- ${r.exerciseId}: ${r.actualReps} reps @ ${r.weight} kg, e1RM ${r.estimatedOneRepMax} kg`)
-    }
-  }
-
-  if (dataLines.length > 0) {
-    sections.push(`<athlete_data>\n${dataLines.join('\n')}\n</athlete_data>`)
-  }
-
-  sections.push(`<guidelines>
-1. Be specific — reference actual numbers and exercises.
-2. Prioritize — identify the single most impactful issue first.
-3. Be phase-aware — match advice to current block and week.
-4. Flag red flags — if RPE is consistently 9-10, suggest deload.
-5. Keep it concise — mobile-first, short paragraphs.
-6. Use the "2 for 2" rule when discussing progression.
-7. Compare lifts — flag any that stall or lag behind.
-8. Tie advice to the timeline: "During next week's volume day..." not "going forward."
-</guidelines>`)
-
-  if (ctx.language === 'ru') {
-    sections.push(`<language>
-Respond in Russian. Use natural Russian terminology:
-- "подход" (set), "повторение" (rep), "рабочий вес" (working weight)
-- "гипертрофия", "объём", "сила" (training day types)
-- "блок", "неделя", "разгрузка" (deload)
-- "присед", "жим лёжа", "жим стоя", "становая тяга", "тяга в наклоне"
-</language>`)
-  }
-
-  sections.push(`<safety>
-- You are NOT a medical professional. If pain/injury — advise consulting a doctor.
-- Do not recommend performance-enhancing substances.
-- If signs of overtraining — prioritize rest over pushing harder.
-</safety>`)
-
-  return sections.join('\n\n')
-}
-
-export function buildAmrapInsightPrompt(ctx: CoachContext): string {
-  const base = buildCoachSystemPrompt(ctx)
-  return base + `\n\n<task>
-The athlete just completed an AMRAP test set (Week 12). Provide a brief analysis (3-4 sentences):
-1. Was the result good/average/poor?
-2. What estimated 1RM does this give and what does it mean for next cycle weights?
-3. One specific, actionable recommendation.
-Keep it encouraging but honest.
-</task>`
-}
-
-export function buildWeeklySummaryPrompt(ctx: CoachContext): string {
-  const base = buildCoachSystemPrompt(ctx)
-  return base + `\n\n<task>
-The athlete completed all training days this week. Provide a brief summary (4-5 sentences):
-1. Overall assessment of the training week.
-2. Standout performances or concerns.
-3. What to focus on next week given the current block.
-Keep it motivating and specific to their data.
-</task>`
-}
-
-export function buildTrainerRecommendationPrompt(ctx: CoachContext & {
-  completedLiftsToday: string[]
-  allWeekLogs: { lift: string; date: string; phase: string }[]
-  recentWorkoutTypes: { type: WorkoutType; date: string }[]
-  daysSinceLastStretch: number | null
-  daysSinceLastAerobic: number | null
-  daysSinceLastStrength: number | null
-  includeHiit: boolean
-  tabataEnabled: boolean
-  tabataEquipment?: string
-  availableEquipment: string[]
-  preferredWorkoutType?: WorkoutType | 'auto'
-}): string {
-  const base = buildCoachSystemPrompt(ctx)
-  const lang = ctx.language === 'ru' ? 'Russian' : 'English'
-  const catalog = buildCatalogSummary()
-
-  const todayInfo = ctx.completedLiftsToday.length > 0
-    ? `Already completed today: ${ctx.completedLiftsToday.join(', ')}.`
-    : 'No workouts completed today yet.'
-
-  const weekLogsInfo = ctx.allWeekLogs.length > 0
-    ? `This week's completed workouts:\n${ctx.allWeekLogs.map(l => `- ${l.lift} on ${l.date} (${l.phase})`).join('\n')}`
-    : 'No workouts completed this week yet.'
-
-  const recentTypesInfo = ctx.recentWorkoutTypes.length > 0
-    ? `Recent workout types (last 7 days):\n${ctx.recentWorkoutTypes.map(w => `- ${w.type} on ${w.date}`).join('\n')}`
-    : 'No workouts in the last 7 days.'
-
-  const recoveryInfo = [
-    ctx.daysSinceLastStrength !== null ? `Days since last strength session: ${ctx.daysSinceLastStrength}` : 'No recent strength session',
-    ctx.daysSinceLastStretch !== null ? `Days since last stretching/mobility: ${ctx.daysSinceLastStretch}` : 'No recent stretching session',
-    ctx.daysSinceLastAerobic !== null ? `Days since last aerobic work: ${ctx.daysSinceLastAerobic}` : 'No recent aerobic session',
-  ].join('\n')
-
-  const equipmentInfo = ctx.availableEquipment.length > 0
-    ? `Available equipment: ${ctx.availableEquipment.join(', ')}`
-    : 'Equipment: bodyweight only'
-
-  const preferredType = ctx.preferredWorkoutType && ctx.preferredWorkoutType !== 'auto'
-    ? `\n**Athlete's preference for today:** ${ctx.preferredWorkoutType}.`
-    : ''
-
-  return base + `\n\n<exercise_catalog>\n${catalog}\n</exercise_catalog>\n\n<task>
-You are an AI trainer planning today's optimal workout session. Respond in ${lang}.
-
-## Current Status
-${todayInfo}
-${weekLogsInfo}
-${recentTypesInfo}
-
-## Recovery Status
-${recoveryInfo}
-
-${equipmentInfo}
-${preferredType}
-
-## YOUR TASK
-Choose the best workout type and plan a full session.
-
-Types: strength (3-day program), crossfit, tabata, stretching, aerobic.
-
-Rules:
-1. Pending strength days → prioritize strength
-2. 3+ days since stretching → recommend stretching
-3. Deload week → stretching or light aerobic only
-4. Day after heavy strength → aerobic or stretching
-5. Honor athlete's preference unless recovery risk
-
-Provide: warm-up, main session, cool-down with specific exercises, sets, reps, weights.
-</task>`
+ЗАПРЕЩЕНО:
+• Рекомендовать тренировки через боль.
+• Давать медицинские диагнозы.
+• Рекомендовать экстремальные диеты или добавки без запроса.
+• Хвалить без причины.
+• Игнорировать сигналы о плохом самочувствии.`
 }

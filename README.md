@@ -1,19 +1,29 @@
 # JaggerAI
 
-Mobile-first PWA for tracking and analyzing Juggernaut Method 2.0 strength training cycles with AI coaching.
+Mobile-first PWA for a personal 16-week strength + rowing program with an AI coach.
+
+## Program
+
+- **16 weeks** split into 4 phases (Adaptation → Volume → Intensity → Peak) + deload week 16.
+- **4 training days/week**: A (Pull), B (Lower), C (Push), D (Recovery).
+- **Rowing protocols** (Technogym) per phase/day: neuromuscular, aerobic, intensive, test.
+- **Automatic progression** by completion quality.
+- **AI coach** with full context (history, weights, PRs, rowing) via Claude / OpenAI / GLM.
 
 ## Features
 
-- Full 16-week Juggernaut Method cycle calculator (Classic + Inverted variants)
-- Workout tracker with set logging, rest timer, and AMRAP recording
-- Progress analytics: Training Max, estimated 1RM, volume, AMRAP charts
-- AI Coach powered by LLM (Claude/OpenAI) for personalized training advice
-- Offline-first with optional Supabase cloud sync
-- Dark/Light theme, Russian + English interface
+- Start/continue active workout with rest timer (vibration on finish).
+- Phase-aware prescriptions: sets × reps × target weight (with gravitron assist, added weight, plank time).
+- Rowing session logger with 500 m splits and Technogym screenshot attachment.
+- Weight + reps + assist quick-adjust controls.
+- Progress charts: exercise weight, rowing pace/power, weekly tonnage, personal records.
+- Full 16-week plan with recommended weights per week.
+- Dark theme default (gym-friendly), RU + EN localization.
+- Local-first storage (IndexedDB via Dexie) — works offline.
 
 ## Tech Stack
 
-React + TypeScript + Vite + Tailwind CSS + Dexie.js + Zustand + Supabase + Recharts
+React + TypeScript + Vite + Tailwind CSS + Dexie (IndexedDB) + Zustand + Recharts + react-i18next + Workbox.
 
 ## Quick Start
 
@@ -21,8 +31,3 @@ React + TypeScript + Vite + Tailwind CSS + Dexie.js + Zustand + Supabase + Recha
 npm install
 npm run dev
 ```
-
-## Documentation
-
-- [CLAUDE.md](./CLAUDE.md) - Project architecture and domain knowledge
-- [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) - Phased development plan
