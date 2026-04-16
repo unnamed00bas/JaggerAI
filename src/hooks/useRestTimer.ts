@@ -17,6 +17,9 @@ export function useRestTimer() {
       const remaining = Math.max(0, Math.ceil((restTimerEnd! - Date.now()) / 1000))
       setSecondsLeft(remaining)
       if (remaining <= 0) {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          navigator.vibrate?.([200, 100, 200])
+        }
         clearRestTimer()
       }
     }

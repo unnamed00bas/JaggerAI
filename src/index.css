@@ -3,18 +3,22 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+  /* Day-type colour coding (per spec §11.2) */
+  --color-day-a: #f07a4a;         /* Orange — Pull */
+  --color-day-a-bg: rgba(240, 122, 74, 0.15);
+  --color-day-b: #c8f135;         /* Yellow-green — Lower */
+  --color-day-b-bg: rgba(200, 241, 53, 0.18);
+  --color-day-c: #4af0c4;         /* Cyan — Push */
+  --color-day-c-bg: rgba(74, 240, 196, 0.18);
+  --color-day-d: #888888;         /* Grey — Recovery */
+  --color-day-d-bg: rgba(136, 136, 136, 0.18);
 
-  --color-surface-50: #f8fafc;
+  /* Accents */
+  --color-accent-500: #f07a4a;
+  --color-accent-600: #d6642f;
+  --color-accent-700: #b85124;
+
+  --color-surface-50:  #f8fafc;
   --color-surface-100: #f1f5f9;
   --color-surface-200: #e2e8f0;
   --color-surface-300: #cbd5e1;
@@ -24,7 +28,7 @@
   --color-surface-700: #334155;
   --color-surface-800: #1e293b;
   --color-surface-900: #0f172a;
-  --color-surface-950: #020617;
+  --color-surface-950: #07101c;
 }
 
 html {
@@ -35,8 +39,14 @@ html {
 body {
   margin: 0;
   min-height: 100dvh;
+  background: var(--color-surface-950);
+  color: var(--color-surface-50);
 }
 
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
 }

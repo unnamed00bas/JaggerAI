@@ -1,13 +1,12 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { Dashboard } from './components/Dashboard'
-import { CycleSetup } from './components/workout/CycleSetup'
-import { WorkoutDay } from './components/workout/WorkoutDay'
-import { TabataDay } from './components/workout/TabataDay'
-import { CycleOverview } from './components/workout/CycleOverview'
+import { WorkoutHistory } from './components/workout/WorkoutHistory'
+import { WorkoutStartPicker } from './components/workout/WorkoutStartPicker'
+import { ActiveWorkout } from './components/workout/ActiveWorkout'
+import { PlanPage } from './components/workout/PlanPage'
 import { AnalyticsPage } from './components/analytics/AnalyticsPage'
 import { CoachPage } from './components/ai/CoachPage'
-import { WorkoutList } from './components/workout/WorkoutList'
 import { SettingsPage } from './components/settings/SettingsPage'
 
 export function App() {
@@ -15,14 +14,16 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/cycle/new" element={<CycleSetup />} />
-        <Route path="/cycle/overview" element={<CycleOverview />} />
-        <Route path="/workout/:dayType" element={<WorkoutDay />} />
-        <Route path="/workout/tabata" element={<TabataDay />} />
-        <Route path="/workout" element={<WorkoutList />} />
+        <Route path="/workout" element={<WorkoutHistory />} />
+        <Route path="/workout/start" element={<WorkoutStartPicker />} />
+        <Route path="/workout/start/:dayType" element={<ActiveWorkout />} />
+        <Route path="/workout/active" element={<ActiveWorkout />} />
+        <Route path="/workout/active/:dayType" element={<ActiveWorkout />} />
+        <Route path="/plan" element={<PlanPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/coach" element={<CoachPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   )

@@ -1,241 +1,251 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSettingsStore } from '../../stores/settingsStore'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
-import { ExerciseSelectionSection } from './ExerciseSelectionSection'
+import { useProfileStore } from '../../stores/profileStore'
+import { useSettingsStore } from '../../stores/settingsStore'
+import { db } from '../../lib/db'
+import i18n from '../../i18n'
 
 export function SettingsPage() {
-  const { t, i18n } = useTranslation()
-  const settings = useSettingsStore()
-  const [saved, setSaved] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
-  const initialSnapshot = useRef<string>('')
+  const { t } = useTranslation()
+  const profile = useProfileStore((s) => s.profile)
+  const cycle = useProfileStore((s) => s.cycle)
+  const setProfile = useProfileStore((s) => s.setProfile)
+  const setCurrentWeek = useProfileStore((s) => s.setCurrentWeek)
+  const resetCycle = useProfileStore((s) => s.resetCycle)
 
-  function getSnapshot() {
-    const s = useSettingsStore.getState()
-    return JSON.stringify({
-      theme: s.theme,
-      language: s.language,
-      defaultRestTimerSeconds: s.defaultRestTimerSeconds,
-      tabataEnabled: s.tabataEnabled,
-      tabataEquipment: s.tabataEquipment,
-      llmProvider: s.llmProvider,
-      llmBaseUrl: s.llmBaseUrl,
-      llmApiKey: s.llmApiKey,
-      llmModel: s.llmModel,
-    })
-  }
+  const s = useSettingsStore()
 
-  useEffect(() => {
-    initialSnapshot.current = getSnapshot()
-  }, [])
+  const workoutCount = useLiveQuery(async () => db.workouts.count(), []) ?? 0
 
-  function markChanged() {
-    setHasChanges(getSnapshot() !== initialSnapshot.current)
-  }
-
-  const showSaved = useCallback(() => {
-    setSaved(true)
-    setHasChanges(false)
-    initialSnapshot.current = getSnapshot()
-  }, [])
-
-  useEffect(() => {
-    if (!saved) return
-    const timer = setTimeout(() => setSaved(false), 1500)
-    return () => clearTimeout(timer)
-  }, [saved])
-
-  function handleLanguageChange(lang: 'ru' | 'en') {
-    settings.setLanguage(lang)
-    i18n.changeLanguage(lang)
-    markChanged()
+  async function exportData() {
+    const [workouts, rowingSessions, prs] = await Promise.all([
+      db.workouts.toArray(),
+      db.rowingSessions.toArray(),
+      db.personalRecords.toArray(),
+    ])
+    const json = JSON.stringify(
+      {
+        version: 1,
+        profile,
+        cycle,
+        workouts,
+        rowingSessions,
+        prs,
+        exportedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    )
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `jaggerai-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">{t('settings.title')}</h1>
-        {saved && (
-          <span className="text-sm text-green-600 dark:text-green-400 font-medium animate-pulse">
-            {t('settings.saved')}
-          </span>
-        )}
-      </div>
+    <div className="flex flex-col gap-4 pb-4">
+      <header>
+        <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
+      </header>
 
       <Card>
-        <h2 className="text-sm font-semibold mb-3">{t('settings.theme')}</h2>
-        <div className="flex gap-2">
-          {(['system', 'light', 'dark'] as const).map((theme) => (
-            <button
-              key={theme}
-              onClick={() => { settings.setTheme(theme); markChanged() }}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
-                settings.theme === theme
-                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400'
-              }`}
-            >
-              {t(`settings.theme${theme.charAt(0).toUpperCase() + theme.slice(1)}`)}
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="text-sm font-semibold mb-3">{t('settings.language')}</h2>
-        <div className="flex gap-2">
-          {([['ru', 'Русский'], ['en', 'English']] as const).map(([code, label]) => (
-            <button
-              key={code}
-              onClick={() => handleLanguageChange(code)}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
-                settings.language === code
-                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="text-sm font-semibold mb-3">{t('settings.restTimer')}</h2>
-        <div className="flex gap-2">
-          {[60, 90, 120, 180, 300].map((seconds) => (
-            <button
-              key={seconds}
-              onClick={() => { settings.setDefaultRestTimerSeconds(seconds); markChanged() }}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
-                settings.defaultRestTimerSeconds === seconds
-                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400'
-              }`}
-            >
-              {seconds >= 60 ? `${seconds / 60}m` : `${seconds}s`}
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      <ExerciseSelectionSection />
-
-      <Card>
-        <div className="flex items-center justify-between mb-1">
-          <div>
-            <h2 className="text-sm font-semibold">{t('tabata.settings.enabled')}</h2>
-            <p className="text-xs text-surface-500 dark:text-surface-400">{t('tabata.settings.enabledDesc')}</p>
-          </div>
-          <button
-            onClick={() => { settings.setTabataEnabled(!settings.tabataEnabled); markChanged() }}
-            className={`relative w-12 h-7 rounded-full transition-colors ${
-              settings.tabataEnabled
-                ? 'bg-primary-500'
-                : 'bg-surface-300 dark:bg-surface-600'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${
-                settings.tabataEnabled ? 'translate-x-5' : ''
-              }`}
-            />
-          </button>
-        </div>
-        {settings.tabataEnabled && (
-          <div className="mt-3">
-            <h3 className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-2">
-              {t('tabata.equipment.title')}
-            </h3>
-            <div className="flex gap-2">
-              {(['bodyweight', 'kettlebell', 'cardio_machines', 'mixed'] as const).map((eq) => (
-                <button
-                  key={eq}
-                  onClick={() => { settings.setTabataEquipment(eq); markChanged() }}
-                  className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
-                    settings.tabataEquipment === eq
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                      : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400'
-                  }`}
-                >
-                  {t(`tabata.equipment.${eq}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </Card>
-
-      <Card>
-        <h2 className="text-sm font-semibold mb-3">{t('settings.llm')}</h2>
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="text-sm font-medium text-surface-600 dark:text-surface-400 mb-1.5 block">
-              {t('settings.llmProvider')}
-            </label>
-            <div className="flex gap-2">
-              {([['claude', 'Claude'], ['openai', 'OpenAI'], ['glm', 'GLM']] as const).map(([provider, label]) => (
-                <button
-                  key={provider}
-                  onClick={() => { settings.setLlmProvider(provider); markChanged() }}
-                  className={`flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors ${
-                    settings.llmProvider === provider
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                      : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {settings.llmProvider === 'glm' && (
+        <h2 className="text-sm font-semibold mb-3">{t('settings.profile')}</h2>
+        <div className="flex flex-col gap-2.5">
+          <Input
+            label={t('settings.name')}
+            value={profile.name}
+            onChange={(e) => setProfile({ name: e.target.value })}
+          />
+          <div className="grid grid-cols-3 gap-2">
             <Input
-              label={t('settings.llmBaseUrl')}
-              value={settings.llmBaseUrl}
-              onChange={(e) => settings.setLlmBaseUrl(e.target.value)}
-              onBlur={markChanged}
-              placeholder="https://open.bigmodel.cn/api/paas/v4"
+              label={t('settings.age')}
+              type="number"
+              value={profile.age}
+              onChange={(e) => setProfile({ age: parseInt(e.target.value, 10) || 0 })}
+            />
+            <Input
+              label={t('settings.height_cm')}
+              type="number"
+              value={profile.heightCm}
+              onChange={(e) => setProfile({ heightCm: parseInt(e.target.value, 10) || 0 })}
+            />
+            <Input
+              label={t('settings.weight_kg')}
+              type="number"
+              value={profile.weightKg}
+              onChange={(e) => setProfile({ weightKg: parseFloat(e.target.value) || 0 })}
+            />
+          </div>
+          <Input
+            label={t('settings.goal')}
+            value={profile.goal}
+            onChange={(e) => setProfile({ goal: e.target.value })}
+          />
+          <Input
+            label={t('settings.experience')}
+            value={profile.experience}
+            onChange={(e) => setProfile({ experience: e.target.value })}
+          />
+          <Input
+            label={t('settings.equipment')}
+            value={profile.equipment}
+            onChange={(e) => setProfile({ equipment: e.target.value })}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              label={t('settings.sessions_per_week')}
+              type="number"
+              value={profile.sessionsPerWeek}
+              onChange={(e) => setProfile({ sessionsPerWeek: parseInt(e.target.value, 10) || 0 })}
+            />
+            <Input
+              label={t('settings.session_duration')}
+              type="number"
+              value={profile.sessionDurationMin}
+              onChange={(e) => setProfile({ sessionDurationMin: parseInt(e.target.value, 10) || 0 })}
+            />
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold mb-3">{t('settings.cycle')}</h2>
+        <Input
+          label={t('settings.current_week')}
+          type="number"
+          min={1}
+          max={16}
+          value={cycle.currentWeek}
+          onChange={(e) => setCurrentWeek(parseInt(e.target.value, 10) || 1)}
+        />
+        <p className="text-xs text-surface-500 mt-2">
+          {workoutCount} {t('workout.title').toLowerCase()}
+        </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            if (confirm(t('settings.reset_cycle_confirm'))) resetCycle()
+          }}
+          className="mt-3 w-full"
+        >
+          {t('settings.reset_cycle')}
+        </Button>
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold mb-3">{t('settings.appearance')}</h2>
+        <div className="flex flex-col gap-2.5">
+          <div>
+            <label className="text-xs text-surface-400 block mb-1">{t('settings.theme')}</label>
+            <select
+              value={s.theme}
+              onChange={(e) => s.setTheme(e.target.value as 'system' | 'light' | 'dark')}
+              className="w-full px-3 py-2 bg-surface-800 border border-surface-700 rounded-lg text-sm text-surface-100"
+            >
+              <option value="system">{t('settings.theme_system')}</option>
+              <option value="light">{t('settings.theme_light')}</option>
+              <option value="dark">{t('settings.theme_dark')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-surface-400 block mb-1">{t('settings.language')}</label>
+            <select
+              value={s.language}
+              onChange={(e) => {
+                const lng = e.target.value as 'ru' | 'en'
+                s.setLanguage(lng)
+                i18n.changeLanguage(lng)
+              }}
+              className="w-full px-3 py-2 bg-surface-800 border border-surface-700 rounded-lg text-sm text-surface-100"
+            >
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold mb-3">{t('settings.training')}</h2>
+        <Input
+          label={t('settings.rest_timer_sec')}
+          type="number"
+          value={s.defaultRestTimerSec}
+          onChange={(e) => s.setDefaultRestTimerSec(parseInt(e.target.value, 10) || 60)}
+        />
+        <label className="flex items-center gap-2 text-sm mt-3">
+          <input
+            type="checkbox"
+            checked={s.notificationsEnabled}
+            onChange={(e) => s.setNotificationsEnabled(e.target.checked)}
+          />
+          {t('settings.notifications_on')}
+        </label>
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold mb-3">{t('settings.ai')}</h2>
+        <div className="flex flex-col gap-2.5">
+          <div>
+            <label className="text-xs text-surface-400 block mb-1">{t('settings.llm_provider')}</label>
+            <select
+              value={s.llmProvider ?? ''}
+              onChange={(e) =>
+                s.setLlmProvider((e.target.value || null) as typeof s.llmProvider)
+              }
+              className="w-full px-3 py-2 bg-surface-800 border border-surface-700 rounded-lg text-sm text-surface-100"
+            >
+              <option value="">{t('settings.llm_none')}</option>
+              <option value="claude">Claude (Anthropic)</option>
+              <option value="openai">OpenAI</option>
+              <option value="glm">GLM</option>
+            </select>
+          </div>
+          <Input
+            label={t('settings.llm_api_key')}
+            type="password"
+            value={s.llmApiKey}
+            onChange={(e) => s.setLlmApiKey(e.target.value)}
+          />
+          <Input
+            label={t('settings.llm_model')}
+            placeholder={
+              s.llmProvider === 'claude'
+                ? 'claude-sonnet-4-5'
+                : s.llmProvider === 'openai'
+                ? 'gpt-4o-mini'
+                : 'glm-4-flash'
+            }
+            value={s.llmModel}
+            onChange={(e) => s.setLlmModel(e.target.value)}
+          />
+          {s.llmProvider === 'glm' && (
+            <Input
+              label={t('settings.llm_base_url')}
+              value={s.llmBaseUrl}
+              onChange={(e) => s.setLlmBaseUrl(e.target.value)}
             />
           )}
-
-          <Input
-            label={t('settings.llmApiKey')}
-            type="password"
-            value={settings.llmApiKey}
-            onChange={(e) => settings.setLlmApiKey(e.target.value)}
-            onBlur={markChanged}
-            placeholder="sk-..."
-          />
-
-          <Input
-            label={t('settings.llmModel')}
-            value={settings.llmModel}
-            onChange={(e) => settings.setLlmModel(e.target.value)}
-            onBlur={markChanged}
-            placeholder={
-              settings.llmProvider === 'claude'
-                ? 'claude-sonnet-4-20250514'
-                : settings.llmProvider === 'glm'
-                  ? 'glm-4-flash'
-                  : 'gpt-4o-mini'
-            }
-          />
         </div>
       </Card>
 
-      <Button
-        size="lg"
-        className="w-full"
-        onClick={showSaved}
-        disabled={!hasChanges && !saved}
-      >
-        {saved ? t('settings.saved') : t('common.save')}
-      </Button>
+      <Card>
+        <h2 className="text-sm font-semibold mb-2">Данные</h2>
+        <Button onClick={exportData} variant="secondary" size="sm" className="w-full">
+          {t('settings.export_data')}
+        </Button>
+      </Card>
+
+      <p className="text-xs text-surface-600 text-center pt-2">
+        {t('settings.version')} 1.0.0
+      </p>
     </div>
   )
 }

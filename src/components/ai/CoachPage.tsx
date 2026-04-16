@@ -1,240 +1,199 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { useSettingsStore } from '../../stores/settingsStore'
-import { useCycleStore } from '../../stores/cycleStore'
-import { useCoachChatStore } from '../../stores/coachChatStore'
-import { db } from '../../lib/db'
-import { getProvider } from '../../lib/llm'
-import { buildCoachSystemPrompt } from '../../lib/llm/coachPrompt'
-import type { LlmMessage } from '../../lib/llm'
-import type { AmrapResult, WorkoutLog } from '../../types'
+import { useNavigate } from 'react-router-dom'
+import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { MarkdownMessage } from '../ui/MarkdownMessage'
+import { useCoachChatStore } from '../../stores/coachChatStore'
+import { useProfileStore } from '../../stores/profileStore'
+import { useSettingsStore } from '../../stores/settingsStore'
+import { buildCoachSystemPrompt, getProvider } from '../../lib/llm'
+import { db } from '../../lib/db'
+import { nextDayType } from '../../lib/program'
+
+const QUICK_PROMPTS = [
+  { key: 'suggest_next_weight' },
+  { key: 'suggest_rowing' },
+  { key: 'suggest_missed' },
+  { key: 'suggest_pain' },
+] as const
 
 export function CoachPage() {
   const { t } = useTranslation()
-  const llmProvider = useSettingsStore((s) => s.llmProvider)
-  const llmApiKey = useSettingsStore((s) => s.llmApiKey)
-  const llmModel = useSettingsStore((s) => s.llmModel)
-  const llmBaseUrl = useSettingsStore((s) => s.llmBaseUrl)
-  const language = useSettingsStore((s) => s.language)
-  const activeCycleId = useCycleStore((s) => s.activeCycleId)
-  const currentWeek = useCycleStore((s) => s.currentWeek)
-
-  const messages = useCoachChatStore((s) => s.messages)
-  const pendingPrompt = useCoachChatStore((s) => s.pendingPrompt)
-  const addMessage = useCoachChatStore((s) => s.addMessage)
-  const setPendingPrompt = useCoachChatStore((s) => s.setPendingPrompt)
-  const clearHistory = useCoachChatStore((s) => s.clearHistory)
+  const navigate = useNavigate()
+  const profile = useProfileStore((s) => s.profile)
+  const cycle = useProfileStore((s) => s.cycle)
+  const { llmProvider, llmApiKey, llmModel, llmBaseUrl, language } = useSettingsStore()
+  const { messages, pendingPrompt, addMessage, clearHistory, setPendingPrompt } = useCoachChatStore()
 
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0)
-
-  const loadingMessages = useMemo(() => {
-    const keys = ['coach.analyzing', 'coach.analyzing1', 'coach.analyzing2', 'coach.analyzing3', 'coach.analyzing4', 'coach.analyzing5']
-    // Shuffle on each loading start
-    return keys.sort(() => Math.random() - 0.5)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading])
+  const [error, setError] = useState<string | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!loading) {
-      setLoadingMsgIndex(0)
-      return
-    }
-    const interval = setInterval(() => {
-      setLoadingMsgIndex((prev) => (prev + 1) % loadingMessages.length)
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [loading, loadingMessages.length])
-  const [containerHeight, setContainerHeight] = useState('80vh')
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const pendingHandled = useRef(false)
-
-  // Measure exact available height: from container top to BottomNav top
-  useEffect(() => {
-    function measure() {
-      if (!containerRef.current) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const nav = document.querySelector('nav.fixed.bottom-0')
-      const navTop = nav ? nav.getBoundingClientRect().top : window.innerHeight
-      const available = navTop - rect.top
-      if (available > 100) {
-        setContainerHeight(`${available}px`)
-      }
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [])
-
-  const cycle = useLiveQuery(
-    () => (activeCycleId ? db.cycles.get(activeCycleId) : undefined),
-    [activeCycleId],
-  )
-
-  const amrapResults = useLiveQuery(
-    () => (activeCycleId
-      ? db.amrapResults.where('cycleId').equals(activeCycleId).sortBy('date')
-      : Promise.resolve([] as AmrapResult[])),
-    [activeCycleId],
-  )
-
-  const workoutLogs = useLiveQuery(
-    () => (activeCycleId
-      ? db.workoutLogs.where('cycleId').equals(activeCycleId).sortBy('date')
-      : Promise.resolve([] as WorkoutLog[])),
-    [activeCycleId],
-  )
-
-  const tabataLogs = useLiveQuery(
-    () => db.tabataLogs.toArray(),
-    [],
-  )
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
   }, [messages, loading])
 
-  function buildSystemPrompt(): string {
-    return buildCoachSystemPrompt({
-      cycle,
-      amrapResults: amrapResults ?? [],
-      workoutLogs: workoutLogs ?? [],
-      tabataLogs: tabataLogs ?? [],
-      language,
-      currentWeek,
-    })
-  }
+  async function send(rawText: string) {
+    const text = rawText.trim()
+    if (!text || loading) return
+    if (!llmProvider || !llmApiKey) {
+      setError(t('coach.configure_first'))
+      return
+    }
+    setError(null)
 
-  const handleSend = useCallback(async (text?: string) => {
-    const msg = text ?? input
-    if (!msg.trim() || loading) return
-
-    addMessage({ role: 'user', content: msg })
+    addMessage({ role: 'user', content: text })
     setInput('')
     setLoading(true)
 
     try {
-      const provider = getProvider(llmProvider!)
-      if (!provider) throw new Error('Provider not found')
+      const [recentWorkouts, personalRecords, lastRowing] = await Promise.all([
+        db.workouts.orderBy('date').reverse().limit(10).toArray(),
+        db.personalRecords.toArray(),
+        db.rowingSessions.orderBy('date').reverse().first(),
+      ])
 
-      const currentMessages = useCoachChatStore.getState().messages
-      const llmMessages: LlmMessage[] = [
-        { role: 'system', content: buildSystemPrompt() },
-        ...currentMessages.map((m) => ({ role: m.role, content: m.content })),
-      ]
+      const weekLogs = recentWorkouts.filter(
+        (w) => new Date(w.date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      )
+      const todayDayType = nextDayType(weekLogs)
 
-      const response = await provider.chat(llmMessages, llmModel, llmApiKey, llmBaseUrl)
-      addMessage({ role: 'assistant', content: response })
-    } catch (err) {
-      addMessage({
-        role: 'assistant',
-        content: `Error: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      const system = buildCoachSystemPrompt({
+        profile,
+        cycle,
+        recentWorkouts,
+        personalRecords,
+        lastRowing,
+        todayDayType,
+        language,
       })
+
+      const provider = getProvider(llmProvider)
+      if (!provider) {
+        setError('Invalid provider')
+        return
+      }
+
+      const chatHistory = [...messages, { role: 'user' as const, content: text, timestamp: '' }]
+        .slice(-10)
+        .map((m) => ({ role: m.role, content: m.content }))
+
+      const reply = await provider.chat(
+        [{ role: 'system', content: system }, ...chatHistory],
+        llmModel,
+        llmApiKey,
+        llmBaseUrl,
+      )
+      addMessage({ role: 'assistant', content: reply })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, loading, llmProvider, llmApiKey, llmModel, llmBaseUrl, cycle, currentWeek, amrapResults, workoutLogs, tabataLogs, language])
-
-  // Handle pending prompt from Dashboard trainer recommendation
-  useEffect(() => {
-    if (pendingPrompt && !pendingHandled.current && !loading && cycle) {
-      pendingHandled.current = true
-      setPendingPrompt(null)
-      handleSend(pendingPrompt)
-    }
-  }, [pendingPrompt, loading, cycle, handleSend, setPendingPrompt])
-
-  if (!llmProvider || !llmApiKey) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="text-5xl">🤖</div>
-        <h1 className="text-xl font-bold">{t('coach.title')}</h1>
-        <p className="text-surface-500 dark:text-surface-400 text-center">
-          {t('coach.noProvider')}
-        </p>
-      </div>
-    )
   }
 
-  const quickPrompts = [
-    { key: 'analyzeProgress', label: t('coach.prompts.analyzeProgress') },
-    { key: 'weakPoints', label: t('coach.prompts.weakPoints') },
-    { key: 'recovery', label: t('coach.prompts.recovery') },
-    { key: 'nutrition', label: t('coach.prompts.nutrition') },
-    { key: 'adjustWeights', label: t('coach.prompts.adjustWeights') },
-  ]
+  // Handle pending prompt (triggered from elsewhere)
+  useEffect(() => {
+    if (pendingPrompt) {
+      const p = pendingPrompt
+      setPendingPrompt(null)
+      send(p)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPrompt])
 
   return (
-    <div ref={containerRef} className="flex flex-col" style={{ height: containerHeight }}>
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <h1 className="text-xl font-bold">{t('coach.title')}</h1>
+    <div className="flex flex-col gap-3 pb-4">
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">{t('coach.title')}</h1>
         {messages.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearHistory}>
-            {t('coach.clearHistory')}
-          </Button>
+          <button
+            onClick={clearHistory}
+            className="text-xs text-surface-400 hover:text-red-400"
+          >
+            {t('coach.clear')}
+          </button>
         )}
-      </div>
+      </header>
 
-      {messages.length === 0 && (
-        <div className="flex flex-wrap gap-2 mb-4 flex-shrink-0">
-          {quickPrompts.map((p) => (
-            <Button key={p.key} variant="secondary" size="sm" onClick={() => handleSend(p.label)}>
-              {p.label}
-            </Button>
-          ))}
-        </div>
-      )}
+      {!llmProvider || !llmApiKey ? (
+        <Card>
+          <p className="text-sm text-surface-300 mb-3">{t('coach.configure_first')}</p>
+          <Button size="sm" onClick={() => navigate('/settings')}>
+            {t('settings.title')}
+          </Button>
+        </Card>
+      ) : null}
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 pb-2">
-        {messages.map((msg, i) => (
+      <div
+        ref={listRef}
+        className="flex flex-col gap-2.5 overflow-y-auto max-h-[calc(100vh-330px)]"
+      >
+        {messages.length === 0 && (
+          <Card>
+            <p className="text-sm text-surface-400 mb-2">{t('coach.no_messages')}</p>
+          </Card>
+        )}
+        {messages.map((m, i) => (
           <div
             key={i}
-            className={`max-w-[85%] rounded-2xl p-3 shadow-sm flex-shrink-0 ${
-              msg.role === 'user'
-                ? 'self-end bg-primary-600 dark:bg-primary-700 text-white'
-                : 'self-start bg-white dark:bg-surface-800 border border-surface-100 dark:border-surface-700 text-surface-900 dark:text-surface-100'
+            className={`rounded-2xl px-3 py-2 text-sm max-w-[88%] ${
+              m.role === 'user'
+                ? 'bg-[color:var(--color-accent-500)] text-surface-950 self-end'
+                : 'bg-surface-800 border border-surface-700 text-surface-100 self-start'
             }`}
           >
-            {msg.role === 'assistant' ? (
-              <MarkdownMessage content={msg.content} />
+            {m.role === 'assistant' ? (
+              <MarkdownMessage content={m.content} />
             ) : (
-              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              <div className="whitespace-pre-wrap">{m.content}</div>
             )}
           </div>
         ))}
         {loading && (
-          <div className="self-start max-w-[85%] rounded-2xl p-3 shadow-sm flex-shrink-0 bg-white dark:bg-surface-800 border border-surface-100 dark:border-surface-700">
-            <p className="text-sm text-surface-500 dark:text-surface-400 transition-opacity duration-300">
-              {t(loadingMessages[loadingMsgIndex])}
-            </p>
-            <div className="flex gap-1 mt-2">
-              <span className="w-2 h-2 rounded-full bg-surface-400 dark:bg-surface-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-2 h-2 rounded-full bg-surface-400 dark:bg-surface-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-2 h-2 rounded-full bg-surface-400 dark:bg-surface-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
+          <div className="self-start bg-surface-800 border border-surface-700 rounded-2xl px-3 py-2 text-sm text-surface-400">
+            …
           </div>
         )}
       </div>
 
-      <div className="flex gap-2 pt-2 flex-shrink-0">
+      {error && (
+        <div className="text-xs text-red-400 bg-red-950/30 border border-red-900/50 rounded-lg p-2">
+          {error}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-1.5">
+        {QUICK_PROMPTS.map((q) => (
+          <button
+            key={q.key}
+            onClick={() => send(t(`coach.${q.key}`))}
+            className="text-xs px-2.5 py-1.5 rounded-full bg-surface-800 border border-surface-700 text-surface-300 hover:bg-surface-700"
+          >
+            {t(`coach.${q.key}`)}
+          </button>
+        ))}
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          send(input)
+        }}
+        className="flex gap-2"
+      >
         <input
-          type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !loading && handleSend()}
           placeholder={t('coach.placeholder')}
-          className="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="flex-1 px-3 py-2.5 bg-surface-800 border border-surface-700 rounded-xl text-sm text-surface-100 placeholder:text-surface-500"
         />
-        <Button onClick={() => handleSend()} disabled={loading || !input.trim()}>
+        <Button type="submit" disabled={loading || !input.trim()} size="md">
           {t('coach.send')}
         </Button>
-      </div>
+      </form>
     </div>
   )
 }
