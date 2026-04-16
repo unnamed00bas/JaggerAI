@@ -7,6 +7,8 @@ import { db } from '../../lib/db'
 import { getProtocolForDay, parseSplit } from '../../lib/rowing'
 import { detectRowingPr } from '../../lib/records'
 import { useWorkoutStore } from '../../stores/workoutStore'
+import { useToastStore } from '../../stores/toastStore'
+import { isValidSplit, parsePositiveInt } from '../../lib/validation'
 import type { DayType, Phase, RowingSession, RowingSplit } from '../../types'
 
 interface Props {
@@ -18,6 +20,8 @@ export function RowingEntry({ dayType, phase }: Props) {
   const { t } = useTranslation()
   const active = useWorkoutStore((s) => s.active)
   const setRowingSessionId = useWorkoutStore((s) => s.setRowingSessionId)
+  const errorToast = useToastStore((s) => s.error)
+  const successToast = useToastStore((s) => s.success)
   const protocol = useMemo(() => getProtocolForDay(dayType, phase), [dayType, phase])
   const activePhase = phase === 'deload' ? null : (phase as 1 | 2 | 3 | 4)
 
@@ -62,30 +66,50 @@ export function RowingEntry({ dayType, phase }: Props) {
 
   async function save() {
     if (!active) return
+
+    if (form.avgSplit && !isValidSplit(form.avgSplit)) {
+      errorToast(t('errors.invalid_split'))
+      return
+    }
+    for (const split of splits) {
+      if (split.splitTime && !isValidSplit(split.splitTime)) {
+        errorToast(`#${split.splitNum}: ${t('errors.invalid_split')}`)
+        return
+      }
+    }
+
     const durationSec =
-      (parseInt(form.durationMin || '0', 10) * 60) + parseInt(form.durationSec || '0', 10)
+      parsePositiveInt(form.durationMin, { max: 600 }) * 60 +
+      parsePositiveInt(form.durationSec, { max: 60 })
     const session: RowingSession = {
       id: crypto.randomUUID(),
       workoutId: active.id,
       protocolId: protocol.id,
       durationSec,
-      distanceM: parseInt(form.distanceM || '0', 10),
+      distanceM: parsePositiveInt(form.distanceM, { max: 100000 }),
       avgSplit: form.avgSplit || '0:00',
-      avgPower: parseInt(form.avgPower || '0', 10),
-      maxPower: parseInt(form.maxPower || '0', 10),
-      avgSpm: parseInt(form.avgSpm || '0', 10),
-      level: parseInt(form.level || '0', 10),
-      calories: parseInt(form.calories || '0', 10),
+      avgPower: parsePositiveInt(form.avgPower, { max: 2000 }),
+      maxPower: parsePositiveInt(form.maxPower, { max: 2000 }),
+      avgSpm: parsePositiveInt(form.avgSpm, { max: 80 }),
+      level: parsePositiveInt(form.level, { max: 30 }),
+      calories: parsePositiveInt(form.calories, { max: 10000 }),
       splits: splits.filter((s) => parseSplit(s.splitTime) != null),
       screenshotDataUrl,
       note: form.note || undefined,
       date: active.date,
       updatedAt: new Date().toISOString(),
     }
-    await db.rowingSessions.put(session)
-    await detectRowingPr(session)
-    setRowingSessionId(session.id)
-    setSaved(true)
+    try {
+      await db.rowingSessions.put(session)
+      await detectRowingPr(session)
+      setRowingSessionId(session.id)
+      setSaved(true)
+      successToast(t('common.done'))
+    } catch (e) {
+      errorToast(
+        `${t('errors.save_rowing_failed')} ${e instanceof Error ? `(${e.message})` : ''}`,
+      )
+    }
   }
 
   if (protocol.id === 'recovery_easy' && dayType === 'D') {

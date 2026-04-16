@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   LineChart,
@@ -13,6 +14,9 @@ import {
   CartesianGrid,
 } from 'recharts'
 import { Card } from '../ui/Card'
+import { Button } from '../ui/Button'
+import { Skeleton, SkeletonCard, SkeletonChart } from '../ui/Skeleton'
+import { EmptyState } from '../ui/EmptyState'
 import { db } from '../../lib/db'
 import { EXERCISES } from '../../lib/exercises'
 import { parseSplit } from '../../lib/rowing'
@@ -20,31 +24,38 @@ import { computeStreak } from '../../lib/program'
 
 export function AnalyticsPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
 
-  const workouts = useLiveQuery(async () => {
-    return (await db.workouts.orderBy('date').toArray()) ?? []
-  }, []) ?? []
+  const workouts = useLiveQuery(
+    async () => (await db.workouts.orderBy('date').toArray()) ?? [],
+    [],
+  )
+  const rowings = useLiveQuery(
+    async () => (await db.rowingSessions.orderBy('date').toArray()) ?? [],
+    [],
+  )
+  const prs = useLiveQuery(
+    async () => (await db.personalRecords.orderBy('updatedAt').reverse().toArray()) ?? [],
+    [],
+  )
 
-  const rowings = useLiveQuery(async () => {
-    return (await db.rowingSessions.orderBy('date').toArray()) ?? []
-  }, []) ?? []
-
-  const prs = useLiveQuery(async () => {
-    return (await db.personalRecords.orderBy('updatedAt').reverse().toArray()) ?? []
-  }, []) ?? []
+  const loading = workouts === undefined || rowings === undefined || prs === undefined
+  const safeWorkouts = useMemo(() => workouts ?? [], [workouts])
+  const safeRowings = useMemo(() => rowings ?? [], [rowings])
+  const safePrs = prs ?? []
 
   const exerciseIds = useMemo(() => {
     const s = new Set<string>()
-    workouts.forEach((w) => w.exercises.forEach((e) => s.add(e.exerciseId)))
+    safeWorkouts.forEach((w) => w.exercises.forEach((e) => s.add(e.exerciseId)))
     return Array.from(s)
-  }, [workouts])
+  }, [safeWorkouts])
 
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null)
   const chosenExerciseId = selectedExerciseId ?? exerciseIds[0] ?? null
 
   const exerciseData = useMemo(() => {
     if (!chosenExerciseId) return []
-    return workouts
+    return safeWorkouts
       .filter((w) => w.exercises.some((e) => e.exerciseId === chosenExerciseId))
       .map((w) => {
         const ex = w.exercises.find((e) => e.exerciseId === chosenExerciseId)!
@@ -55,27 +66,27 @@ export function AnalyticsPage() {
         return { date: w.date.slice(5, 10), weight: top }
       })
       .filter((p) => p.weight > 0)
-  }, [workouts, chosenExerciseId])
+  }, [safeWorkouts, chosenExerciseId])
 
   const rowingPaceData = useMemo(() => {
-    return rowings
+    return safeRowings
       .map((r) => {
         const sec = parseSplit(r.avgSplit)
         if (sec == null) return null
         return { date: r.date.slice(5, 10), splitSec: sec, label: r.avgSplit }
       })
       .filter((p): p is { date: string; splitSec: number; label: string } => p != null)
-  }, [rowings])
+  }, [safeRowings])
 
   const rowingPowerData = useMemo(() => {
-    return rowings
+    return safeRowings
       .filter((r) => r.avgPower > 0)
       .map((r) => ({ date: r.date.slice(5, 10), power: r.avgPower }))
-  }, [rowings])
+  }, [safeRowings])
 
   const weeklyTonnage = useMemo(() => {
     const map = new Map<number, number>()
-    for (const w of workouts) {
+    for (const w of safeWorkouts) {
       if (!w.completed) continue
       const weekKey = w.week
       let tonnage = 0
@@ -90,9 +101,26 @@ export function AnalyticsPage() {
     return Array.from(map.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([week, tonnage]) => ({ week: `W${week}`, tonnage: Math.round(tonnage) }))
-  }, [workouts])
+  }, [safeWorkouts])
 
-  const streak = computeStreak(workouts)
+  const streak = computeStreak(safeWorkouts)
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-4 pb-4">
+        <header>
+          <Skeleton className="h-7 w-40" />
+        </header>
+        <div className="grid grid-cols-2 gap-3">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+        <SkeletonChart height="h-48" />
+        <SkeletonChart />
+        <SkeletonChart />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4 pb-4">
@@ -107,14 +135,20 @@ export function AnalyticsPage() {
         </Card>
         <Card>
           <div className="text-xs text-surface-400">{t('analytics.personal_records')}</div>
-          <div className="mt-2 text-3xl font-bold text-[color:var(--color-accent-500)]">{prs.length}</div>
+          <div className="mt-2 text-3xl font-bold text-[color:var(--color-accent-500)]">{safePrs.length}</div>
         </Card>
       </div>
 
-      {workouts.length === 0 && rowings.length === 0 ? (
-        <Card>
-          <p className="text-sm text-surface-400 text-center py-4">{t('analytics.no_data')}</p>
-        </Card>
+      {safeWorkouts.length === 0 && safeRowings.length === 0 ? (
+        <EmptyState
+          title={t('onboarding.empty_analytics_title')}
+          description={t('onboarding.empty_analytics_text')}
+          action={
+            <Button size="sm" onClick={() => navigate('/workout/start')}>
+              {t('workout.start')}
+            </Button>
+          }
+        />
       ) : (
         <>
           <Card>
@@ -227,11 +261,11 @@ export function AnalyticsPage() {
             </div>
           </Card>
 
-          {prs.length > 0 && (
+          {safePrs.length > 0 && (
             <Card>
               <h2 className="text-sm font-semibold mb-2">{t('analytics.personal_records')}</h2>
               <div className="flex flex-col gap-1.5">
-                {prs.slice(0, 10).map((pr) => (
+                {safePrs.slice(0, 10).map((pr) => (
                   <div key={pr.id} className="flex items-center justify-between text-xs">
                     <span className="text-surface-300">
                       {EXERCISES[pr.exerciseId]?.name ?? pr.exerciseId}

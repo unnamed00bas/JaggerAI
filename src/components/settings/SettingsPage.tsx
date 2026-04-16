@@ -3,8 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
+import { confirmAsync } from '../ui/ConfirmDialog'
 import { useProfileStore } from '../../stores/profileStore'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { useToastStore } from '../../stores/toastStore'
+import { clampAge, clampBodyWeight, clampHeight, parsePositiveInt } from '../../lib/validation'
+import { computeTmsFromHistory } from '../../lib/program'
 import { db } from '../../lib/db'
 import i18n from '../../i18n'
 
@@ -15,37 +19,79 @@ export function SettingsPage() {
   const setProfile = useProfileStore((s) => s.setProfile)
   const setCurrentWeek = useProfileStore((s) => s.setCurrentWeek)
   const resetCycle = useProfileStore((s) => s.resetCycle)
+  const applyWorkingWeights = useProfileStore((s) => s.applyWorkingWeights)
 
   const s = useSettingsStore()
+  const errorToast = useToastStore((s) => s.error)
+  const successToast = useToastStore((s) => s.success)
 
   const workoutCount = useLiveQuery(async () => db.workouts.count(), []) ?? 0
 
   async function exportData() {
-    const [workouts, rowingSessions, prs] = await Promise.all([
-      db.workouts.toArray(),
-      db.rowingSessions.toArray(),
-      db.personalRecords.toArray(),
-    ])
-    const json = JSON.stringify(
-      {
-        version: 1,
-        profile,
-        cycle,
-        workouts,
-        rowingSessions,
-        prs,
-        exportedAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    )
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `jaggerai-backup-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    const ok = await confirmAsync({
+      title: t('confirm.export_title'),
+      message: t('confirm.export_text'),
+      confirmLabel: t('settings.export_data'),
+    })
+    if (!ok) return
+    try {
+      const [workouts, rowingSessions, prs] = await Promise.all([
+        db.workouts.toArray(),
+        db.rowingSessions.toArray(),
+        db.personalRecords.toArray(),
+      ])
+      const json = JSON.stringify(
+        {
+          version: 1,
+          profile,
+          cycle,
+          workouts,
+          rowingSessions,
+          prs,
+          exportedAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      )
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `jaggerai-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      successToast(t('common.done'))
+    } catch (e) {
+      errorToast(
+        `${t('errors.export_failed')}: ${e instanceof Error ? e.message : String(e)}`,
+      )
+    }
+  }
+
+  async function handleApplyAmrap() {
+    try {
+      const workouts = await db.workouts.toArray()
+      const tms = computeTmsFromHistory(workouts)
+      const count = Object.keys(tms).length
+      if (count === 0) {
+        errorToast(t('errors.no_amrap_data'))
+        return
+      }
+      applyWorkingWeights(tms)
+      successToast(t('onboarding.last_amrap_applied'))
+    } catch (e) {
+      errorToast(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function handleReset() {
+    const ok = await confirmAsync({
+      title: t('confirm.reset_cycle_title'),
+      message: t('confirm.reset_cycle_text'),
+      confirmLabel: t('common.reset'),
+      destructive: true,
+    })
+    if (ok) resetCycle()
   }
 
   return (
@@ -66,20 +112,27 @@ export function SettingsPage() {
             <Input
               label={t('settings.age')}
               type="number"
+              min={0}
+              max={120}
               value={profile.age}
-              onChange={(e) => setProfile({ age: parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) => setProfile({ age: clampAge(parseFloat(e.target.value)) })}
             />
             <Input
               label={t('settings.height_cm')}
               type="number"
+              min={0}
+              max={260}
               value={profile.heightCm}
-              onChange={(e) => setProfile({ heightCm: parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) => setProfile({ heightCm: clampHeight(parseFloat(e.target.value)) })}
             />
             <Input
               label={t('settings.weight_kg')}
               type="number"
+              min={0}
+              max={400}
+              step={0.1}
               value={profile.weightKg}
-              onChange={(e) => setProfile({ weightKg: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setProfile({ weightKg: clampBodyWeight(parseFloat(e.target.value)) })}
             />
           </div>
           <Input
@@ -101,14 +154,30 @@ export function SettingsPage() {
             <Input
               label={t('settings.sessions_per_week')}
               type="number"
+              min={1}
+              max={7}
               value={profile.sessionsPerWeek}
-              onChange={(e) => setProfile({ sessionsPerWeek: parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) =>
+                setProfile({
+                  sessionsPerWeek: parsePositiveInt(e.target.value, { min: 1, max: 7, fallback: 1 }),
+                })
+              }
             />
             <Input
               label={t('settings.session_duration')}
               type="number"
+              min={10}
+              max={240}
               value={profile.sessionDurationMin}
-              onChange={(e) => setProfile({ sessionDurationMin: parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) =>
+                setProfile({
+                  sessionDurationMin: parsePositiveInt(e.target.value, {
+                    min: 10,
+                    max: 240,
+                    fallback: 45,
+                  }),
+                })
+              }
             />
           </div>
         </div>
@@ -122,7 +191,9 @@ export function SettingsPage() {
           min={1}
           max={16}
           value={cycle.currentWeek}
-          onChange={(e) => setCurrentWeek(parseInt(e.target.value, 10) || 1)}
+          onChange={(e) =>
+            setCurrentWeek(parsePositiveInt(e.target.value, { min: 1, max: 16, fallback: 1 }))
+          }
         />
         <p className="text-xs text-surface-500 mt-2">
           {workoutCount} {t('workout.title').toLowerCase()}
@@ -130,10 +201,16 @@ export function SettingsPage() {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => {
-            if (confirm(t('settings.reset_cycle_confirm'))) resetCycle()
-          }}
+          onClick={handleApplyAmrap}
           className="mt-3 w-full"
+        >
+          {t('settings.apply_amrap_tm')}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleReset}
+          className="mt-2 w-full"
         >
           {t('settings.reset_cycle')}
         </Button>
@@ -177,8 +254,14 @@ export function SettingsPage() {
         <Input
           label={t('settings.rest_timer_sec')}
           type="number"
+          min={10}
+          max={900}
           value={s.defaultRestTimerSec}
-          onChange={(e) => s.setDefaultRestTimerSec(parseInt(e.target.value, 10) || 60)}
+          onChange={(e) =>
+            s.setDefaultRestTimerSec(
+              parsePositiveInt(e.target.value, { min: 10, max: 900, fallback: 60 }),
+            )
+          }
         />
         <label className="flex items-center gap-2 text-sm mt-3">
           <input

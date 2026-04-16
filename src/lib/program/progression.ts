@@ -1,5 +1,5 @@
-import type { ExerciseDef, Phase, CompletedSet } from '../../types'
-import { getPrescription, roundKg } from './phase'
+import type { ExerciseDef, Phase, CompletedSet, WorkoutLog } from '../../types'
+import { getPrescription, roundKg, estimateOneRepMax } from './phase'
 
 /**
  * Given a set of completed sets from the last session for an exercise, decide
@@ -70,4 +70,36 @@ export function missedDaysAdjustment(days: number): { multiplier: number; action
   if (days <= 7) return { multiplier: 0.95, action: 'reduce_5' }
   if (days <= 14) return { multiplier: 0.9, action: 'restart_phase' }
   return { multiplier: 0.825, action: 'restart_phase_1' }
+}
+
+/**
+ * Compute new working weights (TM) per exercise from recent AMRAP/peak sets.
+ *
+ * Approach:
+ *   1. For each exercise scan all logged sets and pick the one with the highest
+ *      estimated 1RM (Brzycki, reps clamped 1..12).
+ *   2. New TM = 0.9 × estimated 1RM, rounded to 2.5 kg.
+ *
+ * Only sets with `actualWeightKg > 0` and `actualReps >= 1` are considered.
+ */
+export function computeTmsFromHistory(
+  workouts: WorkoutLog[],
+): Record<string, number> {
+  const bestOrm = new Map<string, number>()
+  for (const w of workouts) {
+    for (const ex of w.exercises) {
+      for (const s of ex.sets) {
+        if (!s.actualWeightKg || !s.actualReps) continue
+        const orm = estimateOneRepMax(s.actualWeightKg, s.actualReps)
+        const prev = bestOrm.get(ex.exerciseId) ?? 0
+        if (orm > prev) bestOrm.set(ex.exerciseId, orm)
+      }
+    }
+  }
+  const result: Record<string, number> = {}
+  for (const [id, orm] of bestOrm) {
+    const tm = roundKg(orm * 0.9)
+    if (tm > 0) result[id] = tm
+  }
+  return result
 }

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
+import { SkeletonCard } from '../ui/Skeleton'
+import { EmptyState } from '../ui/EmptyState'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../../lib/db'
 import { DAY_COLORS } from '../../lib/ui/dayStyle'
@@ -20,12 +22,14 @@ export function WorkoutHistory() {
   const logs = useLiveQuery(async () => {
     const all = await db.workouts.orderBy('date').reverse().toArray()
     return all
-  }, []) ?? []
+  }, [])
+  const loading = logs === undefined
+  const safeLogs = useMemo(() => logs ?? [], [logs])
 
   const filtered = useMemo(() => {
-    if (filter === 'ALL') return logs
-    return logs.filter((l) => l.dayType === filter)
-  }, [logs, filter])
+    if (filter === 'ALL') return safeLogs
+    return safeLogs.filter((l) => l.dayType === filter)
+  }, [safeLogs, filter])
 
   return (
     <div className="flex flex-col gap-4 pb-4">
@@ -74,12 +78,21 @@ export function WorkoutHistory() {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
-        <Card>
-          <p className="text-sm text-surface-400 text-center py-4">
-            {t('workout.no_sessions')}
-          </p>
-        </Card>
+      {loading ? (
+        <>
+          <SkeletonCard />
+          <SkeletonCard />
+        </>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title={t('onboarding.empty_history_title')}
+          description={t('onboarding.empty_history_text')}
+          action={
+            <Button size="sm" onClick={() => navigate('/workout/start')}>
+              + {t('workout.start')}
+            </Button>
+          }
+        />
       ) : (
         filtered.map((log) => {
           const c = DAY_COLORS[log.dayType]

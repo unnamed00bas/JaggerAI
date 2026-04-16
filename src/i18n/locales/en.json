@@ -161,6 +161,7 @@
     "current_week": "Current week",
     "reset_cycle": "Reset cycle",
     "reset_cycle_confirm": "Reset cycle progress?",
+    "apply_amrap_tm": "Update working weights from AMRAP",
     "export_data": "Export data (JSON)",
     "import_data": "Import data",
     "version": "Version"
@@ -176,7 +177,14 @@
     "suggest_next_weight": "What weight today?",
     "suggest_missed": "I missed a week — what now?",
     "suggest_rowing": "Analyze my last rowing session",
-    "suggest_pain": "My lower back hurts after deadlift"
+    "suggest_pain": "My lower back hurts after deadlift",
+    "streaming": "Coach is typing…",
+    "preset_analyze": "Analyze my progress",
+    "preset_next": "What weight should I use today?",
+    "preset_recovery": "How can I recover faster?",
+    "preset_nutrition": "Nutrition tips for this program",
+    "preset_plateau": "How to break a plateau?",
+    "preset_technique": "Review my deadlift technique"
   },
   "rpe": {
     "6": "Easy (4+ reserve)",
@@ -199,6 +207,48 @@
     "delete": "Delete",
     "edit": "Edit",
     "reset": "Reset",
-    "done": "Done"
+    "done": "Done",
+    "confirm": "Confirm",
+    "retry": "Retry",
+    "error": "Error"
+  },
+  "errors": {
+    "save_workout_failed": "Could not save workout. Try again.",
+    "save_rowing_failed": "Could not save rowing session. Your inputs are preserved.",
+    "export_failed": "Export failed",
+    "llm_failed": "Coach unavailable: {{message}}",
+    "invalid_split": "Pace format is invalid. Example: 2:05",
+    "invalid_number": "Enter a number greater than zero",
+    "no_amrap_data": "Not enough data — log at least one workout to compute TM"
+  },
+  "onboarding": {
+    "welcome_title": "Welcome to JaggerAI",
+    "welcome_text": "Fill out your profile and log your first workout to start the 16-week cycle",
+    "go_settings": "Open profile",
+    "first_workout": "Start first workout",
+    "empty_history_title": "No workouts yet",
+    "empty_history_text": "Log your first session — history will appear here",
+    "empty_analytics_title": "Not enough data yet",
+    "empty_analytics_text": "Log at least one workout to see progress",
+    "set_tm_title": "Working weights not set",
+    "set_tm_text": "Enter starting weights in settings — the program will compute the load",
+    "last_amrap_applied": "Working weights updated from the last cycle"
+  },
+  "confirm": {
+    "reset_cycle_title": "Reset cycle?",
+    "reset_cycle_text": "Current 16-week progress will be reset. Workout history is kept.",
+    "cancel_workout_title": "Cancel workout?",
+    "cancel_workout_text": "All unsaved sets will be lost.",
+    "clear_chat_title": "Clear chat?",
+    "clear_chat_text": "The coach conversation history will be deleted.",
+    "export_title": "Export data?",
+    "export_text": "Saves a file with your profile, workouts and PRs. API keys are not exported."
+  },
+  "amrap": {
+    "title": "AMRAP — max reps",
+    "log": "Log AMRAP",
+    "reps_done": "Reps",
+    "new_tm": "New working weight: {{kg}} kg",
+    "applied_to_cycle": "Applied to cycle"
   }
 }

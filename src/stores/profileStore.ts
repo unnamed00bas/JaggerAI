@@ -35,6 +35,7 @@ interface ProfileState {
   cycle: CycleState
   setProfile: (patch: Partial<UserProfile>) => void
   setWorkingWeight: (exerciseId: string, kg: number | undefined) => void
+  applyWorkingWeights: (weights: Record<string, number>) => void
   setCurrentWeek: (week: number) => void
   advanceWeek: () => void
   resetCycle: () => void
@@ -57,6 +58,15 @@ export const useProfileStore = create<ProfileState>()(
             cycle: { ...s.cycle, workingWeightsKg: next, updatedAt: new Date().toISOString() },
           }
         }),
+
+      applyWorkingWeights: (weights) =>
+        set((s) => ({
+          cycle: {
+            ...s.cycle,
+            workingWeightsKg: { ...s.cycle.workingWeightsKg, ...weights },
+            updatedAt: new Date().toISOString(),
+          },
+        })),
 
       setCurrentWeek: (week) =>
         set((s) => ({
